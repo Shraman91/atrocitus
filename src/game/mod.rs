@@ -1,5 +1,9 @@
 pub mod bonfire;
 pub mod camera;
+pub mod classes;
+pub mod equipment;
+pub mod inventory;
+pub mod map;
 pub mod npc;
 pub mod particles;
 pub mod player;

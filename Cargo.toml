@@ -7,4 +7,6 @@ edition = "2024"
 crossterm = "0.29.0"
 image = "0.25.10"
 rand = "0.10.3"
+ron = "0.8"
 serde = { version = "1.0.229", features = ["derive"] }
+unicode-width = "0.2"

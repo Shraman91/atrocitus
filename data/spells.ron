@@ -1,0 +1,93 @@
+[
+    (
+        tier: 1,
+        title: "TIER I: NOVICE INCANTATIONS",
+        requirement: "Available at start",
+        spells: [
+            (
+                name: "Soul Dart",
+                cost: 8,
+                element: "Arcane",
+                desc: "Fires a sharp piercing dart of concentrated star-light.",
+                unlocked: true,
+            ),
+            (
+                name: "Ashen Ward",
+                cost: 14,
+                element: "Protection",
+                desc: "Conjures a revolving crystalline barrier deflecting harm.",
+                unlocked: true,
+            ),
+            (
+                name: "Kindle Spark",
+                cost: 10,
+                element: "Flame",
+                desc: "Ignites a crackling burst of embers that clings to foes.",
+                unlocked: true,
+            ),
+        ],
+    ),
+    (
+        tier: 2,
+        title: "TIER II: COLOSSEUM SORCERIES",
+        requirement: "Requires Defeating: The Blind Gladiator",
+        spells: [
+            (
+                name: "Great Soul Spear",
+                cost: 26,
+                element: "Arcane",
+                desc: "Hurls a heavy lance of crystallized cosmos penetrating armor.",
+                unlocked: false,
+            ),
+            (
+                name: "Phantasmal Mirage",
+                cost: 20,
+                element: "Illusion",
+                desc: "Projects an afterimage clone while stepping through the veil.",
+                unlocked: false,
+            ),
+        ],
+    ),
+    (
+        tier: 3,
+        title: "TIER III: ARCHIVAL HIGH ARTS",
+        requirement: "Requires Defeating: Pontiff of the Sands",
+        spells: [
+            (
+                name: "Homing Star Orbs",
+                cost: 38,
+                element: "Arcane",
+                desc: "Summons orbiting celestial orbs that seek out hostile life.",
+                unlocked: false,
+            ),
+            (
+                name: "Chilled Mists",
+                cost: 32,
+                element: "Frost",
+                desc: "Blankets the ground in a frostbite cloud freezing enemy poise.",
+                unlocked: false,
+            ),
+        ],
+    ),
+    (
+        tier: 4,
+        title: "TIER IV: FORBIDDEN PRIMORDIAL",
+        requirement: "Requires Defeating: The Ashen Sovereign",
+        spells: [
+            (
+                name: "Abyssal Firestorm",
+                cost: 65,
+                element: "Dark Flame",
+                desc: "Rips open a rift beneath the arena erupting black volcanic pillars.",
+                unlocked: false,
+            ),
+            (
+                name: "Singularity of Loth",
+                cost: 75,
+                element: "Gravity",
+                desc: "Collapse space-time into a vortex drawing and crushing everything.",
+                unlocked: false,
+            ),
+        ],
+    ),
+]

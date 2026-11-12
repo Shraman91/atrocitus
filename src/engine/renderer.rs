@@ -1,15 +1,31 @@
 use super::color::Color;
 use super::framebuffer::Framebuffer;
+use crate::ui::UiCanvas;
 use std::io::{self, stdout, BufWriter, Write};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Cell {
+    ch: char,
     fg: Color,
     bg: Color,
+    bold: bool,
+    dim: bool,
 }
 
-/// Differential terminal renderer using half-block characters ('▀').
-/// Logical resolution: `width = term_cols`, `height = term_rows * 2`.
+impl Default for Cell {
+    fn default() -> Self {
+        Self {
+            ch: ' ',
+            fg: Color::BLACK,
+            bg: Color::BLACK,
+            bold: false,
+            dim: false,
+        }
+    }
+}
+
+/// Differential terminal renderer using half-block characters ('▀') for graphics
+/// and real monospace terminal characters for the UI layer.
 pub struct DiffRenderer {
     pub cols: usize,
     pub rows: usize,
@@ -48,12 +64,12 @@ impl DiffRenderer {
         self.force_full_redraw = true;
     }
 
-    /// Renders the logical pixel framebuffer to the terminal screen.
-    pub fn render(&mut self, fb: &Framebuffer) -> io::Result<()> {
-        let cols = self.cols.min(fb.width);
-        let rows = self.rows.min(fb.height / 2);
+    /// Renders the logical pixel framebuffer + UI layer to the terminal screen.
+    pub fn render(&mut self, fb: &Framebuffer, ui: &UiCanvas) -> io::Result<()> {
+        let cols = self.cols.min(fb.width).min(ui.cols);
+        let rows = self.rows.min(fb.height / 2).min(ui.rows);
 
-        // Convert 2-pixel vertical slices from Framebuffer to terminal cells
+        // Convert Framebuffer (graphics) + UiCanvas (real text) into terminal cells
         for row in 0..rows {
             let top_y = row * 2;
             let bot_y = top_y + 1;
@@ -62,14 +78,43 @@ impl DiffRenderer {
             let bot_fb_offset = bot_y * fb.width;
 
             for col in 0..cols {
-                let fg = fb.pixels[top_fb_offset + col];
-                let bg = fb.pixels[bot_fb_offset + col];
-                self.curr_cells[cell_row_offset + col] = Cell { fg, bg };
+                let cell_idx = cell_row_offset + col;
+
+                if let Some(ui_cell) = ui.get_cell(col as i32, row as i32) {
+                    let bg = match ui_cell.bg {
+                        Some(custom_bg) => custom_bg,
+                        None => {
+                            let top_px = fb.pixels[top_fb_offset + col];
+                            let bot_px = fb.pixels[bot_fb_offset + col];
+                            top_px.lerp(bot_px, 0.5)
+                        }
+                    };
+
+                    self.curr_cells[cell_idx] = Cell {
+                        ch: ui_cell.ch,
+                        fg: ui_cell.fg,
+                        bg,
+                        bold: ui_cell.bold,
+                        dim: ui_cell.dim,
+                    };
+                } else {
+                    let fg = fb.pixels[top_fb_offset + col];
+                    let bg = fb.pixels[bot_fb_offset + col];
+                    self.curr_cells[cell_idx] = Cell {
+                        ch: '▀',
+                        fg,
+                        bg,
+                        bold: false,
+                        dim: false,
+                    };
+                }
             }
         }
 
         let mut last_fg = Color::TRANSPARENT;
         let mut last_bg = Color::TRANSPARENT;
+        let mut last_bold = false;
+        let mut last_dim = false;
         let mut cursor_row = usize::MAX;
         let mut cursor_col = usize::MAX;
 
@@ -86,6 +131,18 @@ impl DiffRenderer {
                         write!(self.writer, "\x1b[{};{}H", row + 1, col + 1)?;
                         cursor_row = row;
                         cursor_col = col;
+                    }
+
+                    if cell.bold != last_bold || cell.dim != last_dim {
+                        if !cell.bold && !cell.dim {
+                            write!(self.writer, "\x1b[22m")?;
+                        } else if cell.bold {
+                            write!(self.writer, "\x1b[1m")?;
+                        } else if cell.dim {
+                            write!(self.writer, "\x1b[2m")?;
+                        }
+                        last_bold = cell.bold;
+                        last_dim = cell.dim;
                     }
 
                     if cell.fg != last_fg {
@@ -106,7 +163,7 @@ impl DiffRenderer {
                         last_bg = cell.bg;
                     }
 
-                    write!(self.writer, "▀")?;
+                    write!(self.writer, "{}", cell.ch)?;
                     cursor_col += 1;
                 }
             }
@@ -133,22 +190,14 @@ impl DiffRenderer {
         let msg4 = "Resize the window to continue...";
 
         let write_centered = |w: &mut BufWriter<io::Stdout>, row: u16, text: &str| -> io::Result<()> {
-            let col = if (cur_w as usize) > text.len() {
-                (cur_w as usize - text.len()) / 2 + 1
-            } else {
-                1
-            };
+            let col = (cur_w as usize).saturating_sub(text.len()) / 2 + 1;
             write!(w, "\x1b[{};{}H{}", row, col, text)
         };
 
-        write!(self.writer, "\x1b[38;2;220;80;30m")?;
         write_centered(&mut self.writer, center_y.saturating_sub(2), msg1)?;
-        write!(self.writer, "\x1b[38;2;255;220;180m")?;
-        write_centered(&mut self.writer, center_y, msg2)?;
-        write!(self.writer, "\x1b[38;2;160;160;170m")?;
-        write_centered(&mut self.writer, center_y + 2, &msg3)?;
-        write!(self.writer, "\x1b[38;2;100;100;110m")?;
-        write_centered(&mut self.writer, center_y + 4, msg4)?;
+        write_centered(&mut self.writer, center_y.saturating_sub(1), msg2)?;
+        write_centered(&mut self.writer, center_y + 1, &msg3)?;
+        write_centered(&mut self.writer, center_y + 2, msg4)?;
 
         self.writer.flush()?;
         self.force_full_redraw = true;

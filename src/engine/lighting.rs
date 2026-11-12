@@ -32,7 +32,7 @@ impl Default for LightingEngine {
 impl LightingEngine {
     pub fn new() -> Self {
         Self {
-            ambient: Color::rgb(18, 22, 32),
+            ambient: Color::rgb(42, 48, 64),
         }
     }
 

@@ -1,36 +1,50 @@
 # Atrocitus
 
-> A dark-fantasy, souls-like action RPG built in Rust with a custom TrueColor terminal rendering engine.
+> A dark-fantasy, souls-like action RPG built in Rust with a custom dual-layer TrueColor terminal rendering engine.
 
 ---
 
 ## ⚔️ Overview
 
-**Atrocitus** delivers a rich, atmospheric dark-fantasy experience rendered entirely in the terminal using ANSI 24-bit TrueColor and high-density half-block pixel graphics (`▀`), achieving double the vertical resolution of standard terminal cells.
+**Atrocitus** delivers a rich, atmospheric dark-fantasy experience rendered entirely in the terminal using ANSI 24-bit TrueColor. It features a unique **dual-layer rendering architecture**:
+1. **Half-Block Pixel Layer (`▀`)**: Operates at double vertical resolution ($W \times 2H$) for rich 2.5D graphics, dynamic lighting, contact shadow ellipses, layered sprites, and atmospheric post-processing.
+2. **Real Monospace Character UI Layer (`UiCanvas`)**: Draws crisp, native 1-cell monospace terminal characters over the pixel canvas with box-drawing borders (`─ │ ┌ ┐ └ ┘`), `unicode-width` word-wrapping, padding, and 2-cell screen anchoring.
 
-This initial release introduces:
-1. **Title Screen**: Ruined gothic spire silhouettes with slow parallax, ember particle storms, and glowing atmospheric menus.
-2. **Staged Loading Screen**: Real staged asset generation, rotating dark-fantasy lore lines, and an animated flickering bonfire progress bar.
-3. **The Ashen Sanctum (Lobby Hub)**: An interactive 2.5D third-person hub featuring:
-   - Controllable knight with 8-direction movement, footstep dust, and walk/run animations.
-   - Central animated Bonfire with coiled sword, dynamic radial point lighting, soft ground shadows, and interactive resting sequence.
-   - Atmospheric post-processing: drifting ground fog, film grain, and edge vignette.
-   - Depth-sorted environment props (broken arches, stone pillars, gravestones, swords in ground, dead trees, and a fog gate).
-   - NPC silhouettes (Blacksmith with anvil and hooded Firekeeper) with proximity `[E]` talk interactions.
+### Key Systems
+- **Fluid WASD Movement & Mouse Aiming**: WASD provides smooth acceleration ($\sim 0.12\text{s}$) and deceleration ($\sim 0.08\text{s}$) with separate X/Y wall collision sliding. The mouse continuously aims player facing with 8-direction hysteresis buffer.
+- **Eased Dodge Roll**: Right-Click or Space triggers an ease-out roll toward the mouse cursor covering $\sim 65\text{px}$ over $0.45\text{s}$, with invulnerability glow, motion blur ghost trails, $0.8\text{s}$ cooldown, and input buffering during the final $100\text{ms}$.
+- **The Ashen Colosseum Hub & 4 Interactive NPCs**:
+  - **The Veiled Firekeeper**: Choose your class / mantle (Knight, Mage, Assassin, Hunter, Alchemist) with warm amber aura.
+  - **Blacksmith Valen**: Forging & upgrade station with hammer animation and glowing forge coals.
+  - **Unknown Adventurer**: Cryptic world lore and warnings with teal moonlight.
+  - **Shady Witch Morgana**: Arcane shop selling spells and dark elixirs with violet cauldron light.
+- **Overlays & Progression**:
+  - **Map (`M`)**: Real-time fog-of-war tracking, entity markers, and directional player arrow.
+  - **Backpack (`B`)**: 5×4 inventory grid, equipped gear sidebar, item rarities, tooltips, and `F5` debug loot.
+  - **Spellbook (`K`)**: Arcane codex with class incantations.
+  - **Sprite Gallery (`F4`)**: Fullscreen 1x and 3x scale viewer with direction and animation toggles.
+  - **Layout Debug Overlay (`F2`)**: Visualizes all UI layout bounding boxes with colored bracket corners.
 
 ---
 
 ## 🕹️ Controls
 
-| Key | Action |
+| Input | Action |
 |---|---|
-| **W, A, S, D** or **Arrow Keys** | 8-Directional Movement / Menu Navigation |
-| **Shift** (Hold) | Run (Speed boost) |
-| **E** | Interact (Rest at Bonfire / Talk to NPCs / Inspect Fog Gate) |
-| **Enter / Space** | Confirm / Select Menu Option |
-| **Esc** | Pause Game / Return / Back |
-| **F3** | Toggle Debug Overlay (Coordinates, Camera, Facing direction) |
-| **F1** or **H** | Toggle HUD Controls Hint |
+| **W, A, S, D** | Smooth Character Movement (with X/Y wall sliding) |
+| **Mouse Cursor** | Aim Facing Direction (Continuous 8-directional hysteresis) |
+| **Space** / **Right-Click** | Eased Dodge Roll toward Cursor (i-frame glow + ghost trails) |
+| **E** / **Left-Click** | Interact with NPCs, Bonfire, or examine Gate |
+| **M** | Toggle Colosseum Map (Fog-of-war & entity radar) |
+| **B** | Toggle Backpack / Inventory (5×4 grid & gear inspection) |
+| **K** | Toggle Spellbook (Mage incantations & catalysts) |
+| **F1** or **H** | Toggle Controls Hint HUD |
+| **F2** | Toggle UI Layout Debug Bounding Boxes |
+| **F3** | Toggle Debug Overlay (Coordinates, Camera, Colliders) |
+| **F4** | Open Fullscreen Sprite Gallery (1x & 3x scale viewer) |
+| **F5** | Debug: Populate Backpack with 8 Test Items |
+| **F9** | Debug: Reset Class / Mantle |
+| **Esc** | Pause Menu / Back / Close Overlays |
 
 ---
 
@@ -40,6 +54,7 @@ This initial release introduces:
   - Recommended terminals: **Windows Terminal**, **WezTerm**, **Alacritty**, **Ghostty**, **iTerm2**, or **VSCode Terminal**.
 - **Minimum Resolution**: **120 columns × 40 rows** (corresponds to a **120×80** logical pixel canvas).
   - *If your window is smaller, a live warning screen prompts you to enlarge the window, resuming automatically once resized.*
+  - *Fully tested and optimized for 120×40, 160×50, and 200×60.*
 
 ---
 
@@ -57,22 +72,7 @@ cargo run --release
 ### Run Tests & Verification
 ```bash
 cargo test
-cargo clippy
-```
-
----
-
-## 🎨 Swapping in Custom PNG Art
-
-Atrocitus includes a procedural pixel-art engine, but also supports loading standard PNG images from the `assets/` directory without changing game logic:
-
-1. Place your PNG file inside `assets/` (e.g., `assets/custom_knight.png`).
-2. Load and draw it in code using:
-```rust
-use crate::assets::Sprite;
-
-let sprite = Sprite::load_png("assets/custom_knight.png")?;
-sprite.draw(&mut framebuffer, screen_x, screen_y, false);
+cargo clippy --all-targets -- -D warnings
 ```
 
 ---
@@ -81,40 +81,46 @@ sprite.draw(&mut framebuffer, screen_x, screen_y, false);
 
 ```
 src/
-├── main.rs                 # Game loop, TrueColor verification, resize handling
+├── main.rs                 # 60Hz loop, Kitty protocol + repeat fallback, dual-layer rendering
+├── ui/
+│   ├── mod.rs              # UI subsystem exports
+│   ├── layout.rs           # Rect, Margin, Padding, word_wrap, text_width, truncation
+│   └── canvas.rs           # UiCanvas, UiCell, border styles, debug rect overlays
 ├── engine/
 │   ├── color.rs            # 8-bit RGBA color math, blending, lerp, and ANSI writing
-│   ├── framebuffer.rs      # 2D logical pixel grid & drawing primitives
-│   ├── renderer.rs         # Diff-based terminal renderer using half-blocks ('▀')
-│   ├── input.rs            # Kitty keyboard enhancement protocol + fallback held tracking
+│   ├── framebuffer.rs      # 2D logical pixel grid, half-block primitives, draw_ellipse
+│   ├── renderer.rs         # DiffRenderer composing pixel Framebuffer and UiCanvas text
+│   ├── input.rs            # Mouse tracking, held key timing, and VirtualKey mappings
 │   ├── timing.rs           # 60 Hz fixed-timestep clock & FPS monitor
-│   ├── lighting.rs         # Dynamic 2.5D point lights, falloff & projected ground shadows
-│   ├── postprocess.rs      # Vignette, drifting fog simulation, and film grain
+│   ├── lighting.rs         # 2.5D radial point lights, soft shadows & elevated light floor
+│   ├── postprocess.rs      # Drifting ground fog simulation, film grain, and vignette
 │   └── text.rs             # 3x5 and 5x7 bitmap pixel font rasterizers
 ├── assets/
 │   ├── palette.rs          # Ashen dark-fantasy Souls-like color palette
 │   ├── font_data.rs        # Bitmap glyph lookup tables
-│   └── sprites.rs          # Procedural sprite bank & PNG converter
+│   └── sprites.rs          # Layered character gear, dark outlines, rim lighting & animations
 ├── game/
 │   ├── camera.rs           # Smooth 2.5D follow camera with boundary clamping
-│   ├── world.rs            # Sanctum plateau terrain, colliders & props
-│   ├── player.rs           # 8-direction knight controller & animation state
-│   ├── bonfire.rs          # Central bonfire entity, point light & rest banner
-│   ├── npc.rs              # Blacksmith & Firekeeper NPCs with dialogue bubbles
-│   └── particles.rs        # Zero-allocation particle pool (embers, ash, dust)
+│   ├── classes.rs          # Class attributes, gear loadouts & RON save persistence
+│   ├── equipment.rs        # Layered equipment compositing for character sprites
+│   ├── inventory.rs        # 5x4 grid inventory system, rarities, tooltips & F5 debug items
+│   ├── map.rs              # MapGrid fog-of-war discovery system
+│   ├── npc.rs              # 4 Colosseum NPCs (Firekeeper, Blacksmith, Adventurer, Witch)
+│   ├── particles.rs        # Zero-allocation particle pool (embers, ash, dust)
+│   ├── player.rs           # Velocity movement, wall sliding, mouse aim, eased dodge roll
+│   └── world.rs            # Colosseum arena ground, parallax sky, colliders & props
 └── scenes/
-    ├── mod.rs              # Scene trait & cross-fade state machine
-    ├── title.rs            # Title screen with parallax spires & logo glow
-    ├── loading.rs          # Staged initialization, progress bar & lore tips
-    └── lobby.rs            # The Ashen Sanctum interactive hub scene
+    ├── mod.rs              # Scene trait & cross-fade state machine + resolution tests
+    ├── title.rs            # Centered 41-char block logo, native UI menus & settings modal
+    ├── loading.rs          # Asset preload, real-char progress bar & rotating lore tips
+    ├── lobby.rs            # The Ashen Colosseum hub with all 4 NPCs & ambient effects
+    ├── class_select.rs     # Responsive 5-column class cards & mantle selection
+    ├── dialogue.rs         # Firekeeper dialogue with word-wrapping and choice prompt
+    ├── blacksmith.rs       # Blacksmith forge & upgrade station
+    ├── adventurer_dialogue.rs # Unknown Adventurer cryptic lore dialogue
+    ├── witch_shop.rs       # Shady Witch arcane shop & dark elixirs
+    ├── map.rs              # Fullscreen arena map with fog-of-war & entity markers
+    ├── backpack.rs         # 5x4 grid inventory overlay with paper-doll equipment
+    ├── spellbook.rs        # Mage spellbook codex (mapped to 'K')
+    └── gallery.rs          # Fullscreen 1x and 3x sprite gallery viewer ('F4')
 ```
-
----
-
-## 🔮 Roadmap / Next Steps
-
-- **Combat System**: Light/heavy attacks, weapon swings with trail particles, stamina management, and hitboxes.
-- **Enemies & AI**: Wandering hollows, aggro ranges, attack windups, and poise break mechanics.
-- **Inventory & Equipment**: Weapons, armor sets, Estus flask healing item, and consumable souls.
-- **World Expansion**: Transition through the Fog Gate into procedural or tilemap dungeon zones (e.g. *The Sunken Catacombs*, *High Wall of Loth*).
-- **Save / Load**: Serialization of player progress, unlocked shortcuts, and resting bonfire checkpoints via `serde`.

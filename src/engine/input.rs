@@ -1,8 +1,11 @@
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{
+    KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
-const HELD_FALLBACK_TIMEOUT: Duration = Duration::from_millis(130);
+const FIRST_PRESS_TIMEOUT: Duration = Duration::from_millis(500);
+const REPEAT_TIMEOUT: Duration = Duration::from_millis(150);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VirtualKey {
@@ -15,21 +18,43 @@ pub enum VirtualKey {
     S,
     D,
     E,
+    B,
+    M,
+    K,
     Space,
     Shift,
     Enter,
     Escape,
     F1,
+    F2,
     F3,
+    F4,
+    F5,
+    F9,
     Char(char),
     Any,
 }
 
 pub struct InputState {
-    held_timestamps: HashMap<VirtualKey, Instant>,
+    // (last_seen, is_repeat)
+    held_keys: HashMap<VirtualKey, (Instant, bool)>,
     just_pressed: HashSet<VirtualKey>,
     just_released: HashSet<VirtualKey>,
     pub any_key_just_pressed: bool,
+
+    // Mouse Tracking
+    pub mouse_pos: (f32, f32),          // Screen logical pixels (0..width, 0..height)
+    pub mouse_cell: (usize, usize),     // Terminal grid cell (col, row)
+    pub mouse_world_pos: (f32, f32),    // Ground plane coordinates (screen + camera)
+    pub mouse_left_held: bool,
+    pub mouse_left_just_pressed: bool,
+    pub mouse_left_just_released: bool,
+    pub mouse_right_held: bool,
+    pub mouse_right_just_pressed: bool,
+    pub mouse_right_just_released: bool,
+    pub mouse_scroll_delta: i32,
+    pub mouse_ever_detected: bool,
+    pub mouse_moved: bool,
 }
 
 impl Default for InputState {
@@ -41,10 +66,22 @@ impl Default for InputState {
 impl InputState {
     pub fn new() -> Self {
         Self {
-            held_timestamps: HashMap::with_capacity(32),
+            held_keys: HashMap::with_capacity(32),
             just_pressed: HashSet::with_capacity(16),
             just_released: HashSet::with_capacity(16),
             any_key_just_pressed: false,
+            mouse_pos: (60.0, 40.0),
+            mouse_cell: (60, 20),
+            mouse_world_pos: (120.0, 80.0),
+            mouse_left_held: false,
+            mouse_left_just_pressed: false,
+            mouse_left_just_released: false,
+            mouse_right_held: false,
+            mouse_right_just_pressed: false,
+            mouse_right_just_released: false,
+            mouse_scroll_delta: 0,
+            mouse_ever_detected: false,
+            mouse_moved: false,
         }
     }
 
@@ -55,12 +92,21 @@ impl InputState {
         self.just_released.clear();
         self.any_key_just_pressed = false;
 
-        // Check fallback timeout for keys that might not receive release events
+        self.mouse_left_just_pressed = false;
+        self.mouse_left_just_released = false;
+        self.mouse_right_just_pressed = false;
+        self.mouse_right_just_released = false;
+        self.mouse_scroll_delta = 0;
+        self.mouse_moved = false;
+
+        // Check fallback timeout for keys that might not receive release events.
+        // First press gets 500ms grace window, subsequent repeated keys get 150ms window.
         let expired: Vec<VirtualKey> = self
-            .held_timestamps
+            .held_keys
             .iter()
-            .filter_map(|(&key, &time)| {
-                if now.duration_since(time) > HELD_FALLBACK_TIMEOUT {
+            .filter_map(|(&key, &(time, is_repeat))| {
+                let timeout = if is_repeat { REPEAT_TIMEOUT } else { FIRST_PRESS_TIMEOUT };
+                if now.duration_since(time) > timeout {
                     Some(key)
                 } else {
                     None
@@ -69,14 +115,8 @@ impl InputState {
             .collect();
 
         for key in expired {
-            self.held_timestamps.remove(&key);
+            self.held_keys.remove(&key);
             self.just_released.insert(key);
-        }
-    }
-
-    pub fn process_event(&mut self, event: Event, now: Instant) {
-        if let Event::Key(key_event) = event {
-            self.process_key_event(key_event, now);
         }
     }
 
@@ -87,22 +127,73 @@ impl InputState {
             KeyEventKind::Press | KeyEventKind::Repeat => {
                 self.any_key_just_pressed = true;
                 for &vk in &vkeys {
+                    let is_repeat = self.held_keys.contains_key(&vk) || key_event.kind == KeyEventKind::Repeat;
                     self.just_pressed.insert(vk);
-                    self.held_timestamps.insert(vk, now);
+                    self.held_keys.insert(vk, (now, is_repeat));
                 }
             }
             KeyEventKind::Release => {
                 for &vk in &vkeys {
-                    self.held_timestamps.remove(&vk);
+                    self.held_keys.remove(&vk);
                     self.just_released.insert(vk);
                 }
             }
         }
     }
 
+    pub fn process_mouse_event(&mut self, mouse: MouseEvent, cam_x: f32, cam_y: f32) {
+        self.mouse_ever_detected = true;
+        self.mouse_moved = true;
+
+        // Convert terminal column/row into logical pixels (each cell is 1 col x 2 rows in half-block mode)
+        let sx = mouse.column as f32;
+        let sy = (mouse.row as f32) * 2.0 + 0.5;
+
+        self.mouse_pos = (sx, sy);
+        self.mouse_cell = (mouse.column as usize, mouse.row as usize);
+        self.mouse_world_pos = (sx + cam_x, sy + cam_y);
+
+        match mouse.kind {
+            MouseEventKind::Down(MouseButton::Left) => {
+                self.mouse_left_held = true;
+                self.mouse_left_just_pressed = true;
+            }
+            MouseEventKind::Up(MouseButton::Left) => {
+                self.mouse_left_held = false;
+                self.mouse_left_just_released = true;
+            }
+            MouseEventKind::Down(MouseButton::Right) => {
+                self.mouse_right_held = true;
+                self.mouse_right_just_pressed = true;
+            }
+            MouseEventKind::Up(MouseButton::Right) => {
+                self.mouse_right_held = false;
+                self.mouse_right_just_released = true;
+            }
+            MouseEventKind::Drag(MouseButton::Left) => {
+                self.mouse_left_held = true;
+            }
+            MouseEventKind::Drag(MouseButton::Right) => {
+                self.mouse_right_held = true;
+            }
+            MouseEventKind::ScrollUp => {
+                self.mouse_scroll_delta += 1;
+            }
+            MouseEventKind::ScrollDown => {
+                self.mouse_scroll_delta -= 1;
+            }
+            MouseEventKind::Moved => {}
+            _ => {}
+        }
+    }
+
+    pub fn update_camera_projection(&mut self, cam_x: f32, cam_y: f32) {
+        self.mouse_world_pos = (self.mouse_pos.0 + cam_x, self.mouse_pos.1 + cam_y);
+    }
+
     #[inline]
     pub fn is_held(&self, key: VirtualKey) -> bool {
-        self.held_timestamps.contains_key(&key)
+        self.held_keys.contains_key(&key)
     }
 
     #[inline]
@@ -153,7 +244,11 @@ fn map_crossterm_key(event: &KeyEvent) -> Vec<VirtualKey> {
         KeyCode::Enter => keys.push(VirtualKey::Enter),
         KeyCode::Esc => keys.push(VirtualKey::Escape),
         KeyCode::F(1) => keys.push(VirtualKey::F1),
+        KeyCode::F(2) => keys.push(VirtualKey::F2),
         KeyCode::F(3) => keys.push(VirtualKey::F3),
+        KeyCode::F(4) => keys.push(VirtualKey::F4),
+        KeyCode::F(5) => keys.push(VirtualKey::F5),
+        KeyCode::F(9) => keys.push(VirtualKey::F9),
         KeyCode::Char(' ') => keys.push(VirtualKey::Space),
         KeyCode::Char(c) => {
             let lower = c.to_ascii_lowercase();
@@ -175,6 +270,9 @@ fn map_crossterm_key(event: &KeyEvent) -> Vec<VirtualKey> {
                     keys.push(VirtualKey::Right);
                 }
                 'e' => keys.push(VirtualKey::E),
+                'b' => keys.push(VirtualKey::B),
+                'm' => keys.push(VirtualKey::M),
+                'k' => keys.push(VirtualKey::K),
                 _ => {}
             }
             keys.push(VirtualKey::Char(lower));

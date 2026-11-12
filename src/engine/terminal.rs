@@ -4,7 +4,10 @@ use std::panic;
 use std::sync::atomic::{AtomicBool, Ordering};
 use crossterm::{
     cursor::{Hide, Show},
-    event::{DisableBracketedPaste, EnableBracketedPaste, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags},
+    event::{
+        DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
+        KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+    },
     execute,
     terminal::{
         disable_raw_mode, enable_raw_mode, size, EnterAlternateScreen, LeaveAlternateScreen,
@@ -61,6 +64,7 @@ impl TerminalGuard {
         let mut out = stdout();
         execute!(out, EnterAlternateScreen, Hide)?;
         let _ = execute!(out, EnableBracketedPaste);
+        let _ = execute!(out, EnableMouseCapture);
 
         // Best-effort enabling Kitty progressive keyboard enhancement (ignored if unsupported)
         let _ = execute!(
@@ -85,6 +89,7 @@ impl TerminalGuard {
             let mut out = stdout();
             let _ = execute!(out, PopKeyboardEnhancementFlags);
             let _ = execute!(out, DisableBracketedPaste);
+            let _ = execute!(out, DisableMouseCapture);
             let _ = execute!(out, Show, LeaveAlternateScreen);
             let _ = out.flush();
             let _ = disable_raw_mode();

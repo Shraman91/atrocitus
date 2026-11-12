@@ -197,4 +197,31 @@ impl Framebuffer {
             }
         }
     }
+
+    /// Draws a filled ellipse for contact shadows
+    pub fn draw_ellipse(&mut self, cx: i32, cy: i32, rx: i32, ry: i32, color: Color) {
+        if rx <= 0 || ry <= 0 {
+            return;
+        }
+        let y_min = (cy - ry).max(0);
+        let y_max = (cy + ry).min(self.height as i32 - 1);
+        let rx2 = (rx * rx) as f32;
+        let ry2 = (ry * ry) as f32;
+
+        for y in y_min..=y_max {
+            let dy = (y - cy) as f32;
+            let norm_y = (dy * dy) / ry2;
+            if norm_y > 1.0 {
+                continue;
+            }
+            let dx_max = ((1.0 - norm_y) * rx2).sqrt().round() as i32;
+            let x_min = (cx - dx_max).max(0);
+            let x_max = (cx + dx_max).min(self.width as i32 - 1);
+            let row_start = y as usize * self.width;
+            for x in x_min..=x_max {
+                let idx = row_start + x as usize;
+                self.pixels[idx] = color.blend_over(self.pixels[idx]);
+            }
+        }
+    }
 }

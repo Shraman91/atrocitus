@@ -1,4 +1,12 @@
+use super::adventurer_dialogue::AdventurerDialogueScene;
+use super::backpack::BackpackScene;
+use super::blacksmith::BlacksmithScene;
+use super::dialogue::DialogueScene;
+use super::gallery::GalleryScene;
+use super::map::MapScene;
+use super::spellbook::SpellbookScene;
 use super::title::TitleScene;
+use super::witch_shop::WitchShopScene;
 use super::{Scene, SceneTransition};
 use crate::assets::palette::Palette;
 use crate::assets::sprites::SpriteBank;
@@ -10,10 +18,16 @@ use crate::engine::postprocess::PostProcessor;
 use crate::engine::text::{FontSize, TextRenderer};
 use crate::game::bonfire::Bonfire;
 use crate::game::camera::Camera;
+use crate::game::classes::{ClassKind, SaveData};
+use crate::game::inventory::Inventory;
+use crate::game::map::MapGrid;
 use crate::game::npc::{Npc, NpcKind};
 use crate::game::particles::ParticleSystem;
 use crate::game::player::Player;
 use crate::game::world::World;
+use crate::ui::canvas::PanelStyle;
+use crate::ui::layout::Rect;
+use crate::ui::UiCanvas;
 
 enum RenderableItem<'a> {
     Prop(&'a crate::game::world::PropInstance),
@@ -27,17 +41,24 @@ pub struct LobbyScene {
     player: Player,
     camera: Camera,
     bonfire: Bonfire,
-    npcs: Vec<Npc>,
+    firekeeper: Npc,
+    blacksmith: Npc,
+    adventurer: Npc,
+    witch: Npc,
+    map_grid: MapGrid,
+    inventory: Inventory,
     particles: ParticleSystem,
     lighting: LightingEngine,
     time: f32,
+    banner_timer: f32,
     area_banner_timer: f32,
     controls_hint_timer: f32,
     show_controls: bool,
     show_debug: bool,
     is_paused: bool,
     pause_selected: usize,
-    fog_gate_dialogue_timer: f32,
+    gate_dialogue_timer: f32,
+    last_mouse_world: (f32, f32),
 }
 
 impl LobbyScene {
@@ -45,18 +66,25 @@ impl LobbyScene {
         let cx = world.width as f32 * 0.5;
         let cy = world.height as f32 * 0.5;
 
-        let player = Player::new(cx, cy + 18.0);
+        let mut player = Player::new(cx, cy + 18.0);
+        let save = SaveData::load();
+        player.set_class(save.chosen_class);
+
         let camera = Camera::new(world.width as f32, world.height as f32, 120.0, 80.0);
         let bonfire = Bonfire::new(cx, cy);
-
-        let npcs = vec![
-            Npc::new(NpcKind::Blacksmith, cx - 44.0, cy - 8.0),
-            Npc::new(NpcKind::Firekeeper, cx + 42.0, cy - 8.0),
-        ];
+        let firekeeper = Npc::new(NpcKind::Firekeeper, cx + 24.0, cy - 6.0);
+        let blacksmith = Npc::new(NpcKind::Blacksmith, cx - 34.0, cy + 8.0);
+        let adventurer = Npc::new(NpcKind::UnknownAdventurer, cx - 22.0, cy - 26.0);
+        let witch = Npc::new(NpcKind::ShadyWitch, cx + 36.0, cy + 18.0);
+        let map_grid = MapGrid::new(world.width, world.height);
+        let inventory = Inventory::new();
 
         let mut particles = ParticleSystem::new(128);
         for _ in 0..25 {
-            particles.spawn_ash(cx + rand::random::<f32>() * 120.0 - 60.0, cy + rand::random::<f32>() * 80.0 - 40.0);
+            particles.spawn_ash(
+                cx + rand::random::<f32>() * 120.0 - 60.0,
+                cy + rand::random::<f32>() * 80.0 - 40.0,
+            );
         }
 
         Self {
@@ -64,17 +92,24 @@ impl LobbyScene {
             player,
             camera,
             bonfire,
-            npcs,
+            firekeeper,
+            blacksmith,
+            adventurer,
+            witch,
+            map_grid,
+            inventory,
             particles,
             lighting: LightingEngine::new(),
             time: 0.0,
+            banner_timer: 0.0,
             area_banner_timer: 5.0,
-            controls_hint_timer: 8.5,
+            controls_hint_timer: 9.0,
             show_controls: true,
             show_debug: false,
             is_paused: false,
             pause_selected: 0,
-            fog_gate_dialogue_timer: 0.0,
+            gate_dialogue_timer: 0.0,
+            last_mouse_world: (0.0, 0.0),
         }
     }
 }
@@ -91,13 +126,70 @@ impl Scene for LobbyScene {
         _bank: &SpriteBank,
     ) -> SceneTransition {
         self.time += dt;
+        self.banner_timer += dt * 2.5;
+        self.last_mouse_world = input.mouse_world_pos;
 
-        // Toggle Debug overlay
+        // Keep player equipped class in sync with save.ron (e.g. after returning from ClassSelectScene)
+        let save = SaveData::load();
+        if self.player.equipped_class != save.chosen_class {
+            self.player.set_class(save.chosen_class);
+        }
+
+        // Toggle Debug overlay (F3)
         if input.just_pressed(VirtualKey::F3) {
             self.show_debug = !self.show_debug;
         }
 
-        // Toggle Controls hint
+        // Open Sprite Gallery viewer (F4)
+        if input.just_pressed(VirtualKey::F4) {
+            return SceneTransition::Push(Box::new(GalleryScene::new()));
+        }
+
+        // Populate backpack with debug items (F5)
+        if input.just_pressed(VirtualKey::F5) {
+            self.inventory.add_debug_items();
+        }
+
+        // Reset class debug hotkey (F9)
+        if input.just_pressed(VirtualKey::F9) {
+            self.player.set_class(None);
+            let mut save = SaveData::load();
+            save.reset();
+        }
+
+        // Open Spell Book hotkey (K)
+        if input.just_pressed(VirtualKey::K) {
+            return SceneTransition::Push(Box::new(SpellbookScene::new()));
+        }
+
+        // Open Map hotkey (M)
+        let gate_pos = (
+            self.world.width as f32 * 0.5,
+            self.world.height as f32 * 0.5 - self.world.height as f32 * 0.38 + 24.0,
+        );
+        if input.just_pressed(VirtualKey::M) {
+            return SceneTransition::Push(Box::new(MapScene::new(
+                self.map_grid.clone(),
+                (self.player.x, self.player.y),
+                self.player.facing_angle,
+                (self.bonfire.x, self.bonfire.y),
+                gate_pos,
+                vec![
+                    ("F", (self.firekeeper.x, self.firekeeper.y), Palette::BONFIRE_ORANGE),
+                    ("B", (self.blacksmith.x, self.blacksmith.y), Palette::BONFIRE_RED),
+                    ("A", (self.adventurer.x, self.adventurer.y), Palette::MAGE_CYAN),
+                    ("W", (self.witch.x, self.witch.y), Color::rgb(190, 80, 245)),
+                ],
+                (self.world.width as f32, self.world.height as f32),
+            )));
+        }
+
+        // Open Backpack hotkey (B)
+        if input.just_pressed(VirtualKey::B) {
+            return SceneTransition::Push(Box::new(BackpackScene::new(self.inventory.clone())));
+        }
+
+        // Toggle Controls hint (F1 / H)
         if input.just_pressed(VirtualKey::F1) || input.just_pressed(VirtualKey::Char('h')) {
             self.show_controls = !self.show_controls;
             if self.show_controls {
@@ -105,7 +197,7 @@ impl Scene for LobbyScene {
             }
         }
 
-        // Toggle Pause
+        // Toggle Pause (Escape)
         if input.just_pressed(VirtualKey::Escape) {
             self.is_paused = !self.is_paused;
             self.pause_selected = 0;
@@ -139,20 +231,57 @@ impl Scene for LobbyScene {
 
         // Normal Gameplay Updates
         self.player.update(dt, input, &self.world, &mut self.particles);
+        self.map_grid.reveal(self.player.x, self.player.y, 45.0);
         self.bonfire.update(dt, self.player.x, self.player.y, input, &mut self.particles);
+        self.firekeeper.update(dt);
+        self.blacksmith.update(dt);
+        self.adventurer.update(dt);
+        self.witch.update(dt);
 
-        for npc in &mut self.npcs {
-            npc.update(dt, self.player.x, self.player.y, input);
+        let mx = input.mouse_world_pos.0;
+        let my = input.mouse_world_pos.1;
+        let pressed_talk = input.just_pressed(VirtualKey::E);
+        let clicked = input.mouse_left_just_pressed;
+
+        // Firekeeper interaction check (Click or E when in range)
+        if self.firekeeper.is_player_in_range(self.player.x, self.player.y)
+            && (pressed_talk || (clicked && self.firekeeper.is_mouse_hovered(mx, my)))
+        {
+            return SceneTransition::Push(Box::new(DialogueScene::new()));
         }
 
-        // Fog gate interaction check
-        let fog_gate_pos = (self.world.width as f32 * 0.5 + 20.0, self.world.height as f32 * 0.5 - 34.0);
-        let dist_to_fog = ((self.player.x - fog_gate_pos.0).powi(2) + (self.player.y - fog_gate_pos.1).powi(2)).sqrt();
-        if dist_to_fog < 24.0 && input.just_pressed(VirtualKey::E) {
-            self.fog_gate_dialogue_timer = 3.0;
+        // Blacksmith interaction check (Click or E when in range)
+        if self.blacksmith.is_player_in_range(self.player.x, self.player.y)
+            && (pressed_talk || (clicked && self.blacksmith.is_mouse_hovered(mx, my)))
+        {
+            return SceneTransition::Push(Box::new(BlacksmithScene::new()));
         }
-        if self.fog_gate_dialogue_timer > 0.0 {
-            self.fog_gate_dialogue_timer -= dt;
+
+        // Adventurer interaction check (Click or E when in range)
+        if self.adventurer.is_player_in_range(self.player.x, self.player.y)
+            && (pressed_talk || (clicked && self.adventurer.is_mouse_hovered(mx, my)))
+        {
+            return SceneTransition::Push(Box::new(AdventurerDialogueScene::new()));
+        }
+
+        // Witch interaction check (Click or E when in range)
+        if self.witch.is_player_in_range(self.player.x, self.player.y)
+            && (pressed_talk || (clicked && self.witch.is_mouse_hovered(mx, my)))
+        {
+            return SceneTransition::Push(Box::new(WitchShopScene::new()));
+        }
+
+        // Gate of Trials interaction check (North edge)
+        let dist_to_gate = ((self.player.x - gate_pos.0).powi(2) + (self.player.y - gate_pos.1).powi(2)).sqrt();
+        let clicked_gate = input.mouse_left_just_pressed
+            && (input.mouse_world_pos.0 - gate_pos.0).abs() < 18.0
+            && (input.mouse_world_pos.1 - gate_pos.1).abs() < 18.0;
+
+        if (dist_to_gate < 26.0 && input.just_pressed(VirtualKey::E)) || (dist_to_gate < 34.0 && clicked_gate) {
+            self.gate_dialogue_timer = 3.5;
+        }
+        if self.gate_dialogue_timer > 0.0 {
+            self.gate_dialogue_timer -= dt;
         }
 
         // Spawn ambient ash particles
@@ -176,28 +305,29 @@ impl Scene for LobbyScene {
         SceneTransition::None
     }
 
-    fn render(&self, fb: &mut Framebuffer, bank: &SpriteBank) {
+    fn render(&self, fb: &mut Framebuffer, ui: &mut UiCanvas, bank: &SpriteBank) {
         let cam_x = self.camera.x.round() as i32;
         let cam_y = self.camera.y.round() as i32;
+        let banner_frame = (self.banner_timer as usize) % 2;
 
-        // 1. Draw Parallax Sky & Mountain Silhouettes
+        // 1. Parallax Distant Colosseum Sky & Blood Moon
         self.world.draw_parallax_sky(fb, self.camera.x, self.camera.y);
 
-        // 2. Draw Plateau Ground
+        // 2. Arena Ground Plane (Sand & Flagstones)
         self.world.draw_ground(fb, cam_x, cam_y);
 
-        // 3. Collect and Depth-Sort All Renderable Entities & Props by Ground Y
-        let mut render_queue = Vec::with_capacity(self.world.props.len() + self.npcs.len() + 2);
+        // 3. Y-Sorting Render Queue
+        let mut render_queue = Vec::with_capacity(self.world.props.len() + 6);
 
         for prop in &self.world.props {
             render_queue.push((prop.base_y, RenderableItem::Prop(prop)));
         }
         render_queue.push((self.player.y.round() as i32, RenderableItem::Player));
         render_queue.push((self.bonfire.y.round() as i32, RenderableItem::Bonfire));
-
-        for npc in &self.npcs {
-            render_queue.push((npc.y.round() as i32, RenderableItem::Npc(npc)));
-        }
+        render_queue.push((self.firekeeper.y.round() as i32, RenderableItem::Npc(&self.firekeeper)));
+        render_queue.push((self.blacksmith.y.round() as i32, RenderableItem::Npc(&self.blacksmith)));
+        render_queue.push((self.adventurer.y.round() as i32, RenderableItem::Npc(&self.adventurer)));
+        render_queue.push((self.witch.y.round() as i32, RenderableItem::Npc(&self.witch)));
 
         // Sort by base_y ascending
         render_queue.sort_by_key(|&(y, _)| y);
@@ -206,7 +336,7 @@ impl Scene for LobbyScene {
         for (_, item) in render_queue {
             match item {
                 RenderableItem::Prop(p) => {
-                    let sprite = self.world.get_prop_sprite(bank, p.sprite_index);
+                    let sprite = self.world.get_prop_sprite(bank, p.sprite_index, banner_frame);
                     let sx = p.x - cam_x;
                     let sy = p.y - cam_y;
                     sprite.draw(fb, sx, sy, false);
@@ -228,138 +358,147 @@ impl Scene for LobbyScene {
 
         // 6. Dynamic Lighting & Shadows Pass
         let bonfire_light = self.bonfire.get_light();
+        let firekeeper_light = self.firekeeper.get_light(self.time);
+        let blacksmith_light = self.blacksmith.get_light(self.time);
+        let adventurer_light = self.adventurer.get_light(self.time);
+        let witch_light = self.witch.get_light(self.time);
+        let player_aura = crate::engine::lighting::PointLight {
+            x: self.player.x,
+            y: self.player.y - 8.0,
+            radius: 38.0,
+            intensity: 0.55,
+            color: Color::rgb(180, 200, 235),
+            flicker_amount: 0.03,
+        };
+
         let mut shadow_casters = self.world.get_shadow_casters();
         shadow_casters.push(self.player.get_shadow_caster());
-        for npc in &self.npcs {
-            shadow_casters.push(npc.get_shadow_caster());
-        }
+        shadow_casters.push(self.firekeeper.get_shadow_caster());
+        shadow_casters.push(self.blacksmith.get_shadow_caster());
+        shadow_casters.push(self.adventurer.get_shadow_caster());
+        shadow_casters.push(self.witch.get_shadow_caster());
 
         self.lighting.render_shadows(fb, &bonfire_light, &shadow_casters, cam_x, cam_y);
-        self.lighting.apply_lighting(fb, &[bonfire_light], cam_x, cam_y, self.time);
+        self.lighting.apply_lighting(
+            fb,
+            &[bonfire_light, firekeeper_light, blacksmith_light, adventurer_light, witch_light, player_aura],
+            cam_x,
+            cam_y,
+            self.time,
+        );
 
         // 7. Atmospheric Post-Processing
         PostProcessor::apply_drifting_fog(fb, self.time);
         PostProcessor::apply_film_grain(fb, (self.time * 60.0) as u64);
         PostProcessor::apply_vignette(fb, 0.42);
 
-        // 8. World UI Elements (Speech bubbles, [E] Prompts)
+        // 8. World UI Elements (Speech bubbles, [E / Click] Prompts)
         self.bonfire.draw_ui(fb, cam_x, cam_y, self.player.x, self.player.y);
-        for npc in &self.npcs {
-            npc.draw_ui(fb, cam_x, cam_y, self.player.x, self.player.y);
-        }
+        self.firekeeper.draw_ui(fb, cam_x, cam_y, self.player.x, self.player.y, self.last_mouse_world.0, self.last_mouse_world.1);
+        self.blacksmith.draw_ui(fb, cam_x, cam_y, self.player.x, self.player.y, self.last_mouse_world.0, self.last_mouse_world.1);
+        self.adventurer.draw_ui(fb, cam_x, cam_y, self.player.x, self.player.y, self.last_mouse_world.0, self.last_mouse_world.1);
+        self.witch.draw_ui(fb, cam_x, cam_y, self.player.x, self.player.y, self.last_mouse_world.0, self.last_mouse_world.1);
 
-        // Fog Gate prompt
-        let fg_pos = (self.world.width as f32 * 0.5 + 20.0, self.world.height as f32 * 0.5 - 34.0);
-        let dist_to_fg = ((self.player.x - fg_pos.0).powi(2) + (self.player.y - fg_pos.1).powi(2)).sqrt();
-        let fg_scr_x = (fg_pos.0 - cam_x as f32).round() as i32;
-        let fg_scr_y = (fg_pos.1 - cam_y as f32).round() as i32;
+        // Gate of Trials prompt
+        let gate_pos = (
+            self.world.width as f32 * 0.5,
+            self.world.height as f32 * 0.5 - self.world.height as f32 * 0.38 + 24.0,
+        );
+        let dist_to_gate = ((self.player.x - gate_pos.0).powi(2) + (self.player.y - gate_pos.1).powi(2)).sqrt();
+        let gate_scr_x = (gate_pos.0 - cam_x as f32).round() as i32;
+        let gate_scr_y = (gate_pos.1 - cam_y as f32).round() as i32;
 
-        if self.fog_gate_dialogue_timer > 0.0 {
+        if self.gate_dialogue_timer > 0.0 {
             TextRenderer::draw_speech_bubble(
                 fb,
-                fg_scr_x,
-                fg_scr_y - 20,
-                "The seal remains unbroken...",
+                gate_scr_x,
+                gate_scr_y - 20,
+                "The Gate of Trials is sealed until combat begins...",
                 Palette::TEXT_BRIGHT,
                 Palette::UI_PANEL_BG,
                 Palette::UI_BORDER,
             );
-        } else if dist_to_fg < 24.0 {
-            let prompt = "[E] ENTER FOG";
+        } else if dist_to_gate < 28.0 {
+            let prompt = "[Click / E] EXAMINE GATE";
             let prompt_w = TextRenderer::measure_width(prompt, FontSize::Tiny3x5);
-            let bx = fg_scr_x - prompt_w / 2;
-            let by = fg_scr_y - 26;
+            let bx = gate_scr_x - prompt_w / 2;
+            let by = gate_scr_y - 26;
             fb.draw_rect(bx - 2, by - 1, prompt_w + 4, 7, Palette::UI_PANEL_BG, true);
             fb.draw_rect(bx - 2, by - 1, prompt_w + 4, 7, Palette::UI_BORDER, false);
             TextRenderer::draw_text(fb, bx, by, prompt, FontSize::Tiny3x5, Palette::TEXT_MUTED);
         }
 
-        // 9. HUD Elements
-        // Area Banner "THE ASHEN SANCTUM"
+        // 9. UiCanvas Overlaid HUD Elements (Crisp Real Characters)
+        // Area Banner "THE ASHEN COLOSSEUM"
         if self.area_banner_timer > 0.0 {
-            let banner_alpha = if self.area_banner_timer > 4.0 {
-                (5.0 - self.area_banner_timer) / 1.0
-            } else if self.area_banner_timer < 1.0 {
-                self.area_banner_timer / 1.0
-            } else {
-                1.0
-            };
-
-            let title = "THE ASHEN SANCTUM";
-            let title_w = TextRenderer::measure_width(title, FontSize::Standard5x7);
-            let title_x = (fb.width as i32 - title_w) / 2;
-            let title_y = 8;
-
-            let col = Palette::TEXT_BRIGHT.scale(banner_alpha);
-            TextRenderer::draw_text(fb, title_x, title_y, title, FontSize::Standard5x7, col);
-
-            // Subtitle
-            let sub = "SHRINE OF REST";
-            let sub_w = TextRenderer::measure_width(sub, FontSize::Tiny3x5);
-            let sub_x = (fb.width as i32 - sub_w) / 2;
-            let sub_col = Palette::TEXT_MUTED.scale(banner_alpha);
-            TextRenderer::draw_text(fb, sub_x, title_y + 8, sub, FontSize::Tiny3x5, sub_col);
+            ui.print_centered(2, "THE ASHEN COLOSSEUM", Palette::TEXT_BRIGHT, None);
+            ui.print_centered(3, "PROVING GROUNDS OF THE FALLEN", Palette::TEXT_MUTED, None);
         }
 
-        // Controls Hint (bottom-left)
-        if self.show_controls && self.controls_hint_timer > 0.0 {
-            let hint_alpha = (self.controls_hint_timer / 1.0).clamp(0.0, 1.0);
-            let hint_col = Palette::TEXT_MUTED.scale(hint_alpha);
-            let hotkey_col = Palette::TEXT_GOLD.scale(hint_alpha);
+        // Active Class Emblem in Top-Left HUD (2-cell margin)
+        let class_name = if let Some(class) = self.player.equipped_class {
+            class.display_name()
+        } else {
+            "UNBOUND WANDERER"
+        };
+        let class_col = if let Some(class) = self.player.equipped_class {
+            class.accent_color()
+        } else {
+            Palette::TEXT_MUTED
+        };
+        let mantle_badge = format!("╺[MANTLE: {}]╸", class_name);
+        ui.print(2, 1, &mantle_badge, class_col, Some(Color::rgb(14, 16, 22)));
 
-            let by = fb.height as i32 - 14;
-            TextRenderer::draw_text(fb, 4, by, "MOVE:", FontSize::Tiny3x5, hint_col);
-            TextRenderer::draw_text(fb, 26, by, "WASD / ARROWS", FontSize::Tiny3x5, hotkey_col);
-            TextRenderer::draw_text(fb, 4, by + 6, "INTERACT:", FontSize::Tiny3x5, hint_col);
-            TextRenderer::draw_text(fb, 42, by + 6, "[E]", FontSize::Tiny3x5, hotkey_col);
-            TextRenderer::draw_text(fb, 56, by + 6, "RUN:", FontSize::Tiny3x5, hint_col);
-            TextRenderer::draw_text(fb, 72, by + 6, "[SHIFT]", FontSize::Tiny3x5, hotkey_col);
-            TextRenderer::draw_text(fb, 102, by + 6, "MENU:", FontSize::Tiny3x5, hint_col);
-            TextRenderer::draw_text(fb, 124, by + 6, "[ESC]", FontSize::Tiny3x5, hotkey_col);
+        if self.player.equipped_class == Some(ClassKind::Mage) {
+            ui.print(2, 2, " [K] SPELLBOOK", Palette::MAGE_CYAN, Some(Color::rgb(14, 16, 22)));
         }
 
-        // F3 Debug Overlay
+        // Controls Hint Box (Bottom-Left 2-cell margin)
+        if self.show_controls || self.controls_hint_timer > 0.0 {
+            let base_r = ui.rows.saturating_sub(4);
+            let hint_bg = Some(Color::rgb(14, 16, 22));
+            ui.print(2, base_r, "[WASD] Move  [Mouse] Aim  [Space/RMB] Roll  [E] Interact", Palette::TEXT_GOLD, hint_bg);
+            ui.print(2, base_r + 1, "[M] Map  [B] Backpack  [K] Spells  [F2] Layouts  [F4] Gallery", Palette::TEXT_NORMAL, hint_bg);
+            ui.print(2, base_r + 2, "[F1] Toggle Hints  [F3] Debug  [Esc] Pause", Palette::TEXT_MUTED, hint_bg);
+        }
+
+        // Debug Overlay (F3)
         if self.show_debug {
-            let dy = 4;
-            let debug_panel_w = 90;
-            let debug_panel_h = 24;
-            fb.draw_rect(4, dy, debug_panel_w, debug_panel_h, Palette::UI_PANEL_BG, true);
-            fb.draw_rect(4, dy, debug_panel_w, debug_panel_h, Palette::UI_BORDER, false);
-
-            let pos_str = format!("POS: {:.1}, {:.1}", self.player.x, self.player.y);
-            let cam_str = format!("CAM: {:.1}, {:.1}", self.camera.x, self.camera.y);
-            let dir_str = format!("DIR: {:?} | RUN: {}", self.player.dir4, self.player.is_running);
-
-            TextRenderer::draw_text(fb, 6, dy + 2, "DEBUG OVERLAY (F3)", FontSize::Tiny3x5, Palette::TEXT_GOLD);
-            TextRenderer::draw_text(fb, 6, dy + 7, &pos_str, FontSize::Tiny3x5, Palette::TEXT_NORMAL);
-            TextRenderer::draw_text(fb, 6, dy + 12, &cam_str, FontSize::Tiny3x5, Palette::TEXT_NORMAL);
-            TextRenderer::draw_text(fb, 6, dy + 17, &dir_str, FontSize::Tiny3x5, Palette::TEXT_MUTED);
+            let px = self.player.x;
+            let py = self.player.y;
+            let dbg_bg = Some(Color::rgb(14, 16, 22));
+            ui.print(2, 4, &format!("POS: ({:.1}, {:.1}) | DIR: {:?}", px, py, self.player.dir4), Palette::TEXT_GOLD, dbg_bg);
+            ui.print(2, 5, &format!("COLLIDERS: {} | PROPS: {}", self.world.colliders.len(), self.world.props.len()), Palette::TEXT_NORMAL, dbg_bg);
         }
 
-        // Pause Menu Modal
+        // Pause Menu Overlay
         if self.is_paused {
-            PostProcessor::apply_fade(fb, Color::BLACK, 0.6);
+            let pw = 36;
+            let ph = 9;
+            let px = (ui.cols.saturating_sub(pw)) / 2;
+            let py = (ui.rows.saturating_sub(ph)) / 2;
 
-            let modal_w = 70;
-            let modal_h = 38;
-            let mx = (fb.width as i32 - modal_w) / 2;
-            let my = (fb.height as i32 - modal_h) / 2;
+            let pause_rect = Rect::new(px as i32, py as i32, pw as i32, ph as i32);
+            ui.draw_panel(pause_rect, "PAUSED", PanelStyle::double());
 
-            fb.draw_rect(mx, my, modal_w, modal_h, Palette::UI_PANEL_BG, true);
-            fb.draw_rect(mx, my, modal_w, modal_h, Palette::UI_BORDER, false);
+            let pause_items = ["RESUME", "MAIN MENU", "QUIT TO DESKTOP"];
+            let panel_bg = Some(Color::rgb(14, 16, 22));
 
-            TextRenderer::draw_text_centered(fb, my + 4, "PAUSED", FontSize::Standard5x7, Palette::TEXT_GOLD);
-
-            let items = ["RESUME", "RETURN TO TITLE", "QUIT TO DESKTOP"];
-            for (i, label) in items.iter().enumerate() {
-                let py = my + 14 + i as i32 * 7;
-                let (prefix, color) = if i == self.pause_selected {
-                    ("> ", Palette::TEXT_GOLD)
+            for (i, &item) in pause_items.iter().enumerate() {
+                let row = py + 2 + i * 2;
+                let is_sel = i == self.pause_selected;
+                let (prefix, suffix, color, bold) = if is_sel {
+                    ("▶ ", " ◀", Palette::TEXT_GOLD, true)
                 } else {
-                    ("  ", Palette::TEXT_NORMAL)
+                    ("  ", "  ", Palette::TEXT_NORMAL, false)
                 };
-                let full = format!("{}{}", prefix, label);
-                TextRenderer::draw_text_centered(fb, py, &full, FontSize::Tiny3x5, color);
+                let full = format!("{}{}{}", prefix, item, suffix);
+                let col_x = px + (pw.saturating_sub(full.len())) / 2;
+                if bold {
+                    ui.print_bold(col_x, row, &full, color, panel_bg);
+                } else {
+                    ui.print(col_x, row, &full, color, panel_bg);
+                }
             }
         }
     }

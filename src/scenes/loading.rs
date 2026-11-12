@@ -6,8 +6,8 @@ use crate::engine::color::Color;
 use crate::engine::framebuffer::Framebuffer;
 use crate::engine::input::InputState;
 use crate::engine::postprocess::PostProcessor;
-use crate::engine::text::{FontSize, TextRenderer};
 use crate::game::world::World;
+use crate::ui::UiCanvas;
 
 const LORE_TIPS: &[&str] = &[
     "Embers remember what the living forget.",
@@ -19,9 +19,9 @@ const LORE_TIPS: &[&str] = &[
 
 const STAGES: &[&str] = &[
     "Forging sprite tables & glyphs...",
-    "Constructing The Ashen Sanctum...",
+    "Constructing The Ashen Colosseum...",
     "Kindling the sacred bonfire...",
-    "Harmonizing light & shadow...",
+    "Summoning the Veiled Firekeeper...",
     "Awakening the Champion of Ash...",
 ];
 
@@ -97,7 +97,7 @@ impl Scene for LoadingScene {
         SceneTransition::None
     }
 
-    fn render(&self, fb: &mut Framebuffer, bank: &SpriteBank) {
+    fn render(&self, fb: &mut Framebuffer, ui: &mut UiCanvas, bank: &SpriteBank) {
         fb.clear(Palette::VOID_BLACK);
 
         let center_x = fb.width as i32 / 2;
@@ -112,46 +112,25 @@ impl Scene for LoadingScene {
         let glow_r = 16 + (self.bonfire_frame % 2) as i32;
         fb.draw_circle(center_x, center_y - 4, glow_r, Color::rgba(255, 140, 20, 25), false);
 
-        // Thin Ember Progress Bar
-        let bar_w = 70;
-        let bar_x = center_x - bar_w / 2;
-        let bar_y = center_y + 16;
-        let progress = (self.time / self.min_time).clamp(0.0, 1.0);
-        let fill_w = (progress * bar_w as f32).round() as i32;
+        // Post-processing vignette on framebuffer
+        PostProcessor::apply_vignette(fb, 0.5);
 
-        // Bar frame
-        fb.draw_rect(bar_x - 2, bar_y - 1, bar_w + 4, 4, Palette::STONE_DARK, false);
-        // Bar background
-        fb.draw_rect(bar_x, bar_y, bar_w, 2, Palette::VOID_BLACK, true);
-        // Bar fill
-        if fill_w > 0 {
-            fb.draw_rect(bar_x, bar_y, fill_w, 2, Palette::BONFIRE_ORANGE, true);
-            // Glowing leading ember
-            fb.set_pixel(bar_x + fill_w - 1, bar_y, Palette::BONFIRE_CORE);
-            fb.set_pixel(bar_x + fill_w - 1, bar_y + 1, Palette::BONFIRE_CORE);
-        }
+        // Real-character progress bar and lore text on UiCanvas
+        let bar_center_row = ui.rows / 2 + 3;
+        let progress = (self.time / self.min_time).clamp(0.0, 1.0);
+        let bar_width = 36;
+        let filled_chars = ((progress * bar_width as f32).round() as usize).min(bar_width);
+        let empty_chars = bar_width.saturating_sub(filled_chars);
+
+        let bar_str = format!("╺{}{}{:>3}%╸", "━".repeat(filled_chars), "─".repeat(empty_chars), (progress * 100.0) as usize);
+        ui.print_centered(bar_center_row, &bar_str, Palette::BONFIRE_ORANGE, None);
 
         // Current Stage Text
         let stage_text = STAGES[self.stage_index];
-        TextRenderer::draw_text_centered(
-            fb,
-            bar_y + 7,
-            stage_text,
-            FontSize::Tiny3x5,
-            Palette::TEXT_GOLD,
-        );
+        ui.print_centered(bar_center_row + 2, stage_text, Palette::TEXT_GOLD, None);
 
         // Rotating Lore Tip at bottom
-        let lore_text = LORE_TIPS[self.lore_index];
-        TextRenderer::draw_text_centered(
-            fb,
-            fb.height as i32 - 12,
-            lore_text,
-            FontSize::Tiny3x5,
-            Palette::TEXT_MUTED,
-        );
-
-        // Post-processing
-        PostProcessor::apply_vignette(fb, 0.5);
+        let lore_text = format!("“{}”", LORE_TIPS[self.lore_index]);
+        ui.print_centered(ui.rows.saturating_sub(3), &lore_text, Palette::TEXT_MUTED, None);
     }
 }
