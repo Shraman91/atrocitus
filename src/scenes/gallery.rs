@@ -1,6 +1,6 @@
 use super::{Scene, SceneTransition};
 use crate::assets::palette::Palette;
-use crate::assets::sprites::{Direction4, Sprite, SpriteBank};
+use crate::assets::sprites::{Direction4, SpriteBank};
 use crate::engine::color::Color;
 use crate::engine::framebuffer::Framebuffer;
 use crate::engine::input::{InputState, VirtualKey};
@@ -125,8 +125,8 @@ impl Scene for GalleryScene {
     fn render(&self, fb: &mut Framebuffer, ui: &mut UiCanvas, bank: &SpriteBank) {
         fb.clear(Palette::VOID_BLACK);
 
-        let pw = (ui.cols.saturating_sub(6)).min(112);
-        let ph = (ui.rows.saturating_sub(4)).min(36);
+        let pw = (ui.cols.saturating_sub(12)).min(88);
+        let ph = (ui.rows.saturating_sub(6)).min(28);
         let px = (ui.cols.saturating_sub(pw)) / 2;
         let py = (ui.rows.saturating_sub(ph)) / 2;
 
@@ -163,7 +163,7 @@ impl Scene for GalleryScene {
         let cur_char = characters[self.character_idx];
         let bg = Some(Color::rgb(14, 16, 22));
 
-        // Header info - compact and bold
+        // Header info - compact and centered
         let char_header = format!("◄ [A]  Entity [{}/14]: {}  [D] ►", self.character_idx + 1, cur_char.0);
         let char_hx = px + (pw.saturating_sub(char_header.len())) / 2;
         ui.print_bold(char_hx, py + 1, &char_header, cur_char.2, bg);
@@ -192,9 +192,6 @@ impl Scene for GalleryScene {
         // Frame calculation
         let t = self.anim_timer;
 
-        // Magnification scale: use 3x if terminal is large (>= 50 rows), else 2x
-        let mag_scale = if ui.rows >= 50 { 3 } else { 2 };
-
         // Define clear showcase stage rectangle and punch out all UI cells
         // so the half-block TrueColor Framebuffer displays without any text box overlay
         let stage_top = py + 5;
@@ -212,52 +209,25 @@ impl Scene for GalleryScene {
             true,
         );
 
-        let left_cx = stage_rect.x + (stage_rect.w / 4);
-        let right_cx = stage_rect.x + (stage_rect.w * 3 / 5);
+        let center_x = stage_rect.x + (stage_rect.w / 2);
 
-        // Category labels right above the stage
-        ui.print((left_cx - 7).max(0) as usize, py + 4, "─ 1x SCALE ─", Palette::TEXT_BRIGHT, bg);
-        ui.print(
-            (right_cx - 12).max(0) as usize,
-            py + 4,
-            &format!("─ {}x MAGNIFIED VIEW ─", mag_scale),
-            Palette::TEXT_GOLD,
-            bg,
-        );
+        // Category label right above the stage
+        ui.print((center_x - 12).max(0) as usize, py + 4, "─ CHARACTER PREVIEW ─", Palette::TEXT_BRIGHT, bg);
 
         // Pedestal ground line anchored near bottom of the stage
         let pedestal_pixel_y = (stage_bottom as i32 * 2) - 8;
 
-        // Ground stone dais under 1x preview
-        fb.draw_rect(left_cx - 16, pedestal_pixel_y, 32, 2, Palette::STONE_MID, true);
-        fb.draw_ellipse(left_cx, pedestal_pixel_y - 1, 10, 2, Color::rgba(4, 5, 10, 150));
+        // Concentric ground stone dais and contact shadow under sprite
+        fb.draw_rect(center_x - 22, pedestal_pixel_y, 44, 2, Palette::STONE_MID, true);
+        fb.draw_rect(center_x - 16, pedestal_pixel_y - 1, 32, 1, Palette::STONE_WARM_MID, true);
+        fb.draw_ellipse(center_x, pedestal_pixel_y - 1, 12, 3, Color::rgba(4, 5, 10, 150));
 
-        // Ground stone dais under magnified preview
-        let plinth_w = (20 * mag_scale) as i32;
-        fb.draw_rect(right_cx - (plinth_w / 2), pedestal_pixel_y, plinth_w, 3, Palette::STONE_WARM_MID, true);
-        fb.draw_ellipse(right_cx, pedestal_pixel_y - 1, (9 * mag_scale) as i32, 3, Color::rgba(4, 5, 10, 160));
-
-        // Helper to draw scaled sprite
-        let draw_scaled = |fb: &mut Framebuffer, sp: &Sprite, ox: i32, oy: i32, scale: usize| {
-            for sy in 0..sp.height {
-                for sx in 0..sp.width {
-                    let col = sp.get_pixel(sx, sy);
-                    if col.a > 0 {
-                        for dy in 0..scale {
-                            for dx in 0..scale {
-                                fb.set_pixel(ox + (sx * scale + dx) as i32, oy + (sy * scale + dy) as i32, col);
-                            }
-                        }
-                    }
-                }
-            }
-        };
+        // Soft atmospheric ambient glow behind the character
+        fb.draw_circle(center_x, pedestal_pixel_y - 16, 24, Color::rgba(255, 210, 140, 22), false);
 
         // Standardized anchor calculations for humanoid (18x30)
-        let render_1x_x = left_cx - 9;
-        let render_1x_y = pedestal_pixel_y - 30;
-        let render_mag_x = right_cx - ((9 * mag_scale) as i32);
-        let render_mag_y = pedestal_pixel_y - ((30 * mag_scale) as i32);
+        let render_x = center_x - 9;
+        let render_y = pedestal_pixel_y - 30;
 
         let dummy_gear = LayeredGear::empty();
 
@@ -273,8 +243,7 @@ impl Scene for GalleryScene {
                     5 => &bank.body_hit[self.dir_idx],
                     _ => &bank.body_death,
                 };
-                sp.draw(fb, render_1x_x, render_1x_y, false);
-                draw_scaled(fb, sp, render_mag_x, render_mag_y, mag_scale);
+                sp.draw(fb, render_x, render_y, false);
             }
             1..=5 => {
                 // Classes: Mage, Knight, Assassin, Hunter, Alchemist
@@ -298,11 +267,7 @@ impl Scene for GalleryScene {
                                 gear_set.off_hand[self.dir_idx].as_ref(),
                                 gear_set.accessory[self.dir_idx].as_ref(),
                             ];
-                            dummy_gear.draw_composite(fb, body, &gear_sprites, render_1x_x, render_1x_y, dir, false);
-                            draw_scaled(fb, body, render_mag_x, render_mag_y, mag_scale);
-                            for sp in gear_sprites.iter().flatten() {
-                                draw_scaled(fb, sp, render_mag_x, render_mag_y, mag_scale);
-                            }
+                            dummy_gear.draw_composite(fb, body, &gear_sprites, render_x, render_y, dir, false);
                         }
                         1 => {
                             let body = &bank.body_walk[self.dir_idx][(t as usize) % 6];
@@ -314,36 +279,27 @@ impl Scene for GalleryScene {
                                 gear_set.off_hand[self.dir_idx].as_ref(),
                                 gear_set.accessory[self.dir_idx].as_ref(),
                             ];
-                            dummy_gear.draw_composite(fb, body, &gear_sprites, render_1x_x, render_1x_y, dir, false);
-                            draw_scaled(fb, body, render_mag_x, render_mag_y, mag_scale);
-                            for sp in gear_sprites.iter().flatten() {
-                                draw_scaled(fb, sp, render_mag_x, render_mag_y, mag_scale);
-                            }
+                            dummy_gear.draw_composite(fb, body, &gear_sprites, render_x, render_y, dir, false);
                         }
                         2 => {
                             let sp = &bank.body_roll[self.dir_idx][(t as usize) % 7];
-                            sp.draw(fb, render_1x_x, render_1x_y, false);
-                            draw_scaled(fb, sp, render_mag_x, render_mag_y, mag_scale);
+                            sp.draw(fb, render_x, render_y, false);
                         }
                         3 => {
                             let sp = &gear_set.lmb_frames[self.dir_idx][(t as usize) % 4];
-                            sp.draw(fb, render_1x_x, render_1x_y, false);
-                            draw_scaled(fb, sp, render_mag_x, render_mag_y, mag_scale);
+                            sp.draw(fb, render_x, render_y, false);
                         }
                         4 => {
                             let sp = &gear_set.rmb_frames[self.dir_idx][(t as usize) % 4];
-                            sp.draw(fb, render_1x_x, render_1x_y, false);
-                            draw_scaled(fb, sp, render_mag_x, render_mag_y, mag_scale);
+                            sp.draw(fb, render_x, render_y, false);
                         }
                         5 => {
                             let sp = &gear_set.hit_frame[self.dir_idx];
-                            sp.draw(fb, render_1x_x, render_1x_y, false);
-                            draw_scaled(fb, sp, render_mag_x, render_mag_y, mag_scale);
+                            sp.draw(fb, render_x, render_y, false);
                         }
                         _ => {
                             let sp = &gear_set.death_frame;
-                            sp.draw(fb, render_1x_x, render_1x_y, false);
-                            draw_scaled(fb, sp, render_mag_x, render_mag_y, mag_scale);
+                            sp.draw(fb, render_x, render_y, false);
                         }
                     }
                 }
@@ -351,37 +307,29 @@ impl Scene for GalleryScene {
             6 => {
                 // Firekeeper (18x30)
                 let sp = &bank.firekeeper_anim[(t as usize) % 4];
-                sp.draw(fb, render_1x_x, render_1x_y, false);
-                draw_scaled(fb, sp, render_mag_x, render_mag_y, mag_scale);
+                sp.draw(fb, render_x, render_y, false);
             }
             7 => {
                 // Blacksmith (22x34)
-                let b_x = left_cx - 11;
+                let b_x = center_x - 11;
                 let b_y = pedestal_pixel_y - 34;
-                let b_mag_x = right_cx - ((11 * mag_scale) as i32);
-                let b_mag_y = pedestal_pixel_y - ((34 * mag_scale) as i32);
                 let sp = &bank.blacksmith_anim[(t as usize) % 4];
                 sp.draw(fb, b_x, b_y, false);
-                draw_scaled(fb, sp, b_mag_x, b_mag_y, mag_scale);
             }
             8 => {
                 // Unknown Adventurer (18x30)
                 let sp = &bank.adventurer_anim[(t as usize) % 4];
-                sp.draw(fb, render_1x_x, render_1x_y, false);
-                draw_scaled(fb, sp, render_mag_x, render_mag_y, mag_scale);
+                sp.draw(fb, render_x, render_y, false);
             }
             9 => {
                 // Shady Witch (18x30)
                 let sp = &bank.witch_anim[(t as usize) % 4];
-                sp.draw(fb, render_1x_x, render_1x_y, false);
-                draw_scaled(fb, sp, render_mag_x, render_mag_y, mag_scale);
+                sp.draw(fb, render_x, render_y, false);
             }
             10 => {
                 // Acid Sludge (26x20)
-                let s_x = left_cx - 13;
+                let s_x = center_x - 13;
                 let s_y = pedestal_pixel_y - 20;
-                let s_mag_x = right_cx - ((13 * mag_scale) as i32);
-                let s_mag_y = pedestal_pixel_y - ((20 * mag_scale) as i32);
                 let sp = match self.state_idx {
                     0 => &bank.sludge_idle[(t as usize) % 4],
                     1 => &bank.sludge_walk[(t as usize) % 4],
@@ -392,28 +340,26 @@ impl Scene for GalleryScene {
                     _ => &bank.sludge_death[(t as usize) % 3],
                 };
                 sp.draw(fb, s_x, s_y, false);
-                draw_scaled(fb, sp, s_mag_x, s_mag_y, mag_scale);
             }
             11 => {
-                // Bogged Skeleton (18x30)
+                // Bogged Skeleton (16x25)
+                let s_x = center_x - 8;
+                let s_y = pedestal_pixel_y - 25;
                 let sp = match self.state_idx {
                     0 => &bank.skeleton_idle[self.dir_idx][(t as usize) % 4],
                     1 => &bank.skeleton_walk[self.dir_idx][(t as usize) % 4],
-                    2 => &bank.skeleton_walk[self.dir_idx][2],
-                    3 => &bank.skeleton_draw[self.dir_idx][(t as usize) % 3],
+                    2 => &bank.skeleton_walk[self.dir_idx][1],
+                    3 => &bank.skeleton_draw[self.dir_idx][2], // bow drawn with poison arrow
                     4 => &bank.skeleton_release[self.dir_idx],
                     5 => &bank.skeleton_hit[self.dir_idx],
                     _ => &bank.skeleton_death,
                 };
-                sp.draw(fb, render_1x_x, render_1x_y, false);
-                draw_scaled(fb, sp, render_mag_x, render_mag_y, mag_scale);
+                sp.draw(fb, s_x, s_y, false);
             }
             12 => {
-                // Carrion Fly (12x12 hovering)
-                let f_x = left_cx - 6;
-                let f_y = pedestal_pixel_y - 26;
-                let f_mag_x = right_cx - ((6 * mag_scale) as i32);
-                let f_mag_y = pedestal_pixel_y - ((26 * mag_scale) as i32);
+                // Carrion Fly (12x9 hovering)
+                let f_x = center_x - 6;
+                let f_y = pedestal_pixel_y - 18;
                 let sp = match self.state_idx {
                     3..=4 => &bank.fly_attack[(t as usize) % 2],
                     5 => &bank.fly_hit,
@@ -422,14 +368,11 @@ impl Scene for GalleryScene {
                 };
                 bank.fly_shadow.draw(fb, f_x, pedestal_pixel_y - 4, false);
                 sp.draw(fb, f_x, f_y, false);
-                draw_scaled(fb, sp, f_mag_x, f_mag_y, mag_scale);
             }
             _ => {
-                // Corpse Worm (14x10 crawling)
-                let w_x = left_cx - 7;
-                let w_y = pedestal_pixel_y - 10;
-                let w_mag_x = right_cx - ((7 * mag_scale) as i32);
-                let w_mag_y = pedestal_pixel_y - ((10 * mag_scale) as i32);
+                // Corpse Worm (12x8 crawling)
+                let w_x = center_x - 6;
+                let w_y = pedestal_pixel_y - 8;
                 let sp = match self.state_idx {
                     2..=4 => &bank.worm_lunge[(t as usize) % 2],
                     5 => &bank.worm_hit,
@@ -437,7 +380,6 @@ impl Scene for GalleryScene {
                     _ => &bank.worm_anim[(t as usize) % 4],
                 };
                 sp.draw(fb, w_x, w_y, false);
-                draw_scaled(fb, sp, w_mag_x, w_mag_y, mag_scale);
             }
         }
 

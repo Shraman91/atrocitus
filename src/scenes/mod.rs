@@ -310,19 +310,19 @@ mod tests {
             assert_eq!(bank.witch_anim[f].height, 30);
         }
 
-        // 3. Verify Enemy dimensions
+        // 3. Verify Enemy dimensions (including new CharSprite enemy_sprites)
         for f in 0..4 {
             assert_eq!(bank.sludge_idle[f].width, 26);
             assert_eq!(bank.sludge_idle[f].height, 20);
-            assert_eq!(bank.worm_anim[f].width, 14);
-            assert_eq!(bank.worm_anim[f].height, 10);
+            assert_eq!(bank.worm_anim[f].width, 12);
+            assert_eq!(bank.worm_anim[f].height, 8);
             for d in 0..4 {
-                assert_eq!(bank.skeleton_idle[d][f].width, 18);
-                assert_eq!(bank.skeleton_idle[d][f].height, 30);
+                assert_eq!(bank.skeleton_idle[d][f].width, 16);
+                assert_eq!(bank.skeleton_idle[d][f].height, 25);
             }
         }
         assert_eq!(bank.fly_anim[0].width, 12);
-        assert_eq!(bank.fly_anim[0].height, 12);
+        assert_eq!(bank.fly_anim[0].height, 9);
         assert_eq!(bank.fly_shadow.width, 12);
         assert_eq!(bank.fly_shadow.height, 4);
 
@@ -380,20 +380,17 @@ mod tests {
         let gallery = gallery::GalleryScene::new();
         gallery.render(&mut fb, &mut ui, &bank);
 
-        let pw = (120usize.saturating_sub(6)).min(112);
-        let ph = (40usize.saturating_sub(4)).min(36);
+        let pw = (120usize.saturating_sub(12)).min(88);
+        let ph = (40usize.saturating_sub(6)).min(28);
         let px = (120 - pw) / 2;
         let py = (40 - ph) / 2;
         let stage_top = py + 5;
         let stage_rect = crate::ui::layout::Rect::new(px as i32 + 2, stage_top as i32, pw as i32 - 4, (py + ph - 3 - stage_top) as i32);
-        let left_cx = stage_rect.x + (stage_rect.w / 4);
-        let right_cx = stage_rect.x + (stage_rect.w * 3 / 5);
+        let center_x = stage_rect.x + (stage_rect.w / 2);
         let check_row = stage_top + 4;
 
         // UI cell over 1x sprite MUST be None
-        assert_eq!(ui.get_cell(left_cx, check_row as i32), None, "1x sprite in gallery must not be obscured by UI cell");
-        // UI cell over magnified sprite MUST be None
-        assert_eq!(ui.get_cell(right_cx, check_row as i32), None, "Magnified sprite in gallery must not be obscured by UI cell");
+        assert_eq!(ui.get_cell(center_x, check_row as i32), None, "1x sprite in gallery must not be obscured by UI cell");
 
         // Verify ClassSelectScene also does not obscure rotating character preview
         let class_select = class_select::ClassSelectScene::new();

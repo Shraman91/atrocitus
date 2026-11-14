@@ -1,3 +1,4 @@
+use super::enemy_sprites;
 use super::palette::Palette;
 use crate::engine::color::Color;
 use crate::engine::framebuffer::Framebuffer;
@@ -534,118 +535,51 @@ impl SpriteBank {
                 generate_sludge_death(2),
             ],
 
-            skeleton_idle: [
-                [
-                    generate_skeleton_idle(Direction4::South, 0),
-                    generate_skeleton_idle(Direction4::South, 1),
-                    generate_skeleton_idle(Direction4::South, 2),
-                    generate_skeleton_idle(Direction4::South, 3),
-                ],
-                [
-                    generate_skeleton_idle(Direction4::North, 0),
-                    generate_skeleton_idle(Direction4::North, 1),
-                    generate_skeleton_idle(Direction4::North, 2),
-                    generate_skeleton_idle(Direction4::North, 3),
-                ],
-                [
-                    generate_skeleton_idle(Direction4::East, 0),
-                    generate_skeleton_idle(Direction4::East, 1),
-                    generate_skeleton_idle(Direction4::East, 2),
-                    generate_skeleton_idle(Direction4::East, 3),
-                ],
-                [
-                    generate_skeleton_idle(Direction4::SouthEast, 0),
-                    generate_skeleton_idle(Direction4::SouthEast, 1),
-                    generate_skeleton_idle(Direction4::SouthEast, 2),
-                    generate_skeleton_idle(Direction4::SouthEast, 3),
-                ],
-            ],
-            skeleton_walk: [
-                [
-                    generate_skeleton_walk(Direction4::South, 0),
-                    generate_skeleton_walk(Direction4::South, 1),
-                    generate_skeleton_walk(Direction4::South, 2),
-                    generate_skeleton_walk(Direction4::South, 3),
-                ],
-                [
-                    generate_skeleton_walk(Direction4::North, 0),
-                    generate_skeleton_walk(Direction4::North, 1),
-                    generate_skeleton_walk(Direction4::North, 2),
-                    generate_skeleton_walk(Direction4::North, 3),
-                ],
-                [
-                    generate_skeleton_walk(Direction4::East, 0),
-                    generate_skeleton_walk(Direction4::East, 1),
-                    generate_skeleton_walk(Direction4::East, 2),
-                    generate_skeleton_walk(Direction4::East, 3),
-                ],
-                [
-                    generate_skeleton_walk(Direction4::SouthEast, 0),
-                    generate_skeleton_walk(Direction4::SouthEast, 1),
-                    generate_skeleton_walk(Direction4::SouthEast, 2),
-                    generate_skeleton_walk(Direction4::SouthEast, 3),
-                ],
-            ],
-            skeleton_draw: [
-                [
-                    generate_skeleton_draw(Direction4::South, 0),
-                    generate_skeleton_draw(Direction4::South, 1),
-                    generate_skeleton_draw(Direction4::South, 2),
-                ],
-                [
-                    generate_skeleton_draw(Direction4::North, 0),
-                    generate_skeleton_draw(Direction4::North, 1),
-                    generate_skeleton_draw(Direction4::North, 2),
-                ],
-                [
-                    generate_skeleton_draw(Direction4::East, 0),
-                    generate_skeleton_draw(Direction4::East, 1),
-                    generate_skeleton_draw(Direction4::East, 2),
-                ],
-                [
-                    generate_skeleton_draw(Direction4::SouthEast, 0),
-                    generate_skeleton_draw(Direction4::SouthEast, 1),
-                    generate_skeleton_draw(Direction4::SouthEast, 2),
-                ],
-            ],
-            skeleton_release: [
-                generate_skeleton_release(Direction4::South),
-                generate_skeleton_release(Direction4::North),
-                generate_skeleton_release(Direction4::East),
-                generate_skeleton_release(Direction4::SouthEast),
-            ],
-            skeleton_hit: [
-                generate_skeleton_hit(Direction4::South),
-                generate_skeleton_hit(Direction4::North),
-                generate_skeleton_hit(Direction4::East),
-                generate_skeleton_hit(Direction4::SouthEast),
-            ],
+            skeleton_idle: core::array::from_fn(|_| [
+                enemy_sprites::SKELETON.to_sprite(0),
+                enemy_sprites::SKELETON.to_sprite(0),
+                enemy_sprites::SKELETON.to_sprite(0),
+                enemy_sprites::SKELETON.to_sprite(0),
+            ]),
+            skeleton_walk: core::array::from_fn(|_| [
+                enemy_sprites::SKELETON.to_sprite(0),
+                enemy_sprites::SKELETON.to_sprite(1),
+                enemy_sprites::SKELETON.to_sprite(0),
+                enemy_sprites::SKELETON.to_sprite(1),
+            ]),
+            skeleton_draw: core::array::from_fn(|_| [
+                enemy_sprites::SKELETON.to_sprite(0),
+                enemy_sprites::SKELETON.to_sprite(1),
+                enemy_sprites::SKELETON.to_sprite(2),
+            ]),
+            skeleton_release: core::array::from_fn(|_| enemy_sprites::SKELETON.to_sprite(2)),
+            skeleton_hit: core::array::from_fn(|_| enemy_sprites::SKELETON.to_sprite(1)),
             skeleton_death: generate_skeleton_death(),
 
             fly_anim: [
-                generate_fly_frame(0),
-                generate_fly_frame(1),
+                enemy_sprites::FLY.to_sprite(0),
+                enemy_sprites::FLY.to_sprite(1),
             ],
             fly_shadow: generate_fly_shadow(),
             fly_attack: [
-                generate_fly_attack(0),
-                generate_fly_attack(1),
+                enemy_sprites::FLY.to_sprite(0),
+                enemy_sprites::FLY.to_sprite(1),
             ],
-            fly_hit: generate_fly_hit(),
-            fly_death: generate_fly_death(),
+            fly_hit: enemy_sprites::FLY.to_sprite(1),
+            fly_death: enemy_sprites::FLY.to_sprite(0),
 
             worm_anim: [
-                generate_worm_frame(0),
-                generate_worm_frame(1),
-                generate_worm_frame(2),
-                generate_worm_frame(3),
+                enemy_sprites::WORM.to_sprite(0),
+                enemy_sprites::WORM.to_sprite(1),
+                enemy_sprites::WORM.to_sprite(2),
+                enemy_sprites::WORM.to_sprite(1),
             ],
             worm_lunge: [
-                generate_worm_lunge(0),
-                generate_worm_lunge(1),
+                enemy_sprites::WORM.to_sprite(1),
+                enemy_sprites::WORM.to_sprite(2),
             ],
-            worm_hit: generate_worm_hit(),
-            worm_death: generate_worm_death(),
+            worm_hit: enemy_sprites::WORM.to_sprite(1),
+            worm_death: enemy_sprites::WORM.to_sprite(2),
         }
     }
 
@@ -2537,11 +2471,11 @@ fn generate_skeleton_hit(dir: Direction4) -> Sprite {
 }
 
 fn generate_skeleton_death() -> Sprite {
-    let mut sp = Sprite::new(18, 30);
+    let mut sp = Sprite::new(16, 25);
     let bone = Palette::BONE_WHITE;
-    sp.fill_rect(4, 25, 10, 3, bone);
-    sp.fill_rect(6, 23, 4, 3, bone);
-    sp.set_pixel(5, 22, Palette::MUSHROOM_RED);
+    sp.fill_rect(3, 20, 10, 3, bone);
+    sp.fill_rect(5, 18, 5, 3, bone);
+    sp.set_pixel(4, 17, Palette::MUSHROOM_RED);
     sp.add_outline(Palette::OUTLINE_DARK);
     sp
 }

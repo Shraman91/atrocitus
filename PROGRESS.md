@@ -58,9 +58,10 @@ Tracking document for all phases of development. Updated after every phase to pr
   - [x] Shady Witch (hunched, crooked hat, bubbling flask with sparkle pop, 4-frame idle).
 - [x] **Enemy Sprite Set (Phase 3 Preparation)**
   - [x] Sludge (~26px blobby acid ooze with squash/stretch idle, squelch walk, swelling vomit wind-up, spit frame, hit, death melt).
-  - [x] Skeleton (~30px bogged archer, 4-frame idle with glowing poison eyes and red mushrooms, 4-frame walk, draw-bow, poison release, hit, bone heap death).
-  - [x] Fly (~12px buzzing wings, glowing eyes, ground shadow, attack bite, hit, death crash).
-  - [x] Worm (~14px segmented horror grub, squirming 4-frame cycle, ring-toothed mouth flare, lunge, death shrivel).
+  - [x] Skeleton (16x25 bogged archer, `src/assets/enemy_sprites.rs`: 0 = idle with bow, 1 = walk, 2 = bow drawn with telegraph poison arrow).
+  - [x] Fly (12x9 carrion fly, `src/assets/enemy_sprites.rs`: 0 = wings up, 1 = wings down with ground shadow).
+  - [x] Worm (12x8 segmented horror grub, `src/assets/enemy_sprites.rs`: 3-frame undulating wiggle cycle).
+  - [x] Added `CharSprite` system with palette mapping and emissive pixel flags (`e` and `v`) for dark glowing eyes and poison tips.
 - [x] **Sprite Gallery (`F4`) & Controls Polish**
   - [x] Fix sprite visibility in Gallery: punch out UI cells over stage rect with `ui.clear_rect()`, rendering half-block TrueColor sprites directly over a stone floor on `Framebuffer`.
   - [x] Fix Class Select preview visibility: punch out UI cells over card interior so rotating class character preview renders cleanly without UI box interference.
