@@ -137,34 +137,34 @@ impl Npc {
             _ => 1.5,
         };
         self.anim_timer += dt * speed;
-        self.anim_frame = (self.anim_timer as usize) % 2;
+        self.anim_frame = (self.anim_timer as usize) % 4;
     }
 
     pub fn draw(&self, fb: &mut Framebuffer, bank: &SpriteBank, cam_x: i32, cam_y: i32) {
         let (sprite, draw_x, draw_y, shadow_rx) = match self.kind {
             NpcKind::Firekeeper => (
                 &bank.firekeeper_anim[self.anim_frame],
-                (self.x - 8.0).round() as i32 - cam_x,
-                (self.y - 21.0).round() as i32 - cam_y,
-                6,
+                (self.x - 9.0).round() as i32 - cam_x,
+                (self.y - 28.0).round() as i32 - cam_y,
+                7,
             ),
             NpcKind::Blacksmith => (
                 &bank.blacksmith_anim[self.anim_frame],
-                (self.x - 10.0).round() as i32 - cam_x,
+                (self.x - 11.0).round() as i32 - cam_x,
                 (self.y - 32.0).round() as i32 - cam_y,
-                8,
+                9,
             ),
             NpcKind::UnknownAdventurer => (
                 &bank.adventurer_anim[self.anim_frame],
                 (self.x - 9.0).round() as i32 - cam_x,
                 (self.y - 28.0).round() as i32 - cam_y,
-                6,
+                7,
             ),
             NpcKind::ShadyWitch => (
                 &bank.witch_anim[self.anim_frame],
                 (self.x - 9.0).round() as i32 - cam_x,
                 (self.y - 28.0).round() as i32 - cam_y,
-                6,
+                7,
             ),
         };
 

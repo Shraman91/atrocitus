@@ -8,11 +8,11 @@ use crate::engine::framebuffer::Framebuffer;
 use crate::engine::input::{InputState, VirtualKey};
 use crate::engine::lighting::ShadowCaster;
 
-pub const PLAYER_WALK_SPEED: f32 = 44.0;
-pub const PLAYER_RUN_SPEED: f32 = 64.0;
-pub const ROLL_DURATION: f32 = 0.45;
-pub const ROLL_COOLDOWN: f32 = 0.80;
-pub const ROLL_DISTANCE: f32 = 65.0;
+pub const PLAYER_WALK_SPEED: f32 = 56.0;
+pub const PLAYER_RUN_SPEED: f32 = 86.0;
+pub const ROLL_DURATION: f32 = 0.38;
+pub const ROLL_COOLDOWN: f32 = 0.48;
+pub const ROLL_DISTANCE: f32 = 68.0;
 
 pub struct Player {
     pub x: f32,
@@ -70,15 +70,15 @@ impl Player {
     }
 
     pub fn get_collider(&self) -> Collider {
-        Collider::new(self.x - 5.0, self.y - 3.0, 10.0, 6.0)
+        Collider::new(self.x - 6.0, self.y - 4.0, 12.0, 8.0)
     }
 
     pub fn get_shadow_caster(&self) -> ShadowCaster {
         ShadowCaster {
             x: self.x,
             y: self.y,
-            width: 12.0,
-            height: 20.0,
+            width: 14.0,
+            height: 28.0,
         }
     }
 
@@ -86,6 +86,7 @@ impl Player {
         &mut self,
         dt: f32,
         input: &InputState,
+        mouse_world: (f32, f32),
         world: &World,
         particles: &mut ParticleSystem,
     ) {
@@ -99,10 +100,9 @@ impl Player {
         if self.roll_cooldown > 0.0 {
             self.roll_cooldown -= dt;
 
-            // In final 100ms of recovery, buffer roll input
-            if self.roll_cooldown <= 0.10 {
-                let wants_roll_buffer = input.mouse_right_just_pressed
-                    || input.just_pressed(VirtualKey::Space);
+            // In final 150ms of recovery, buffer roll input
+            if self.roll_cooldown <= 0.15 {
+                let wants_roll_buffer = input.just_pressed(VirtualKey::Space);
                 if wants_roll_buffer {
                     self.roll_buffered = true;
                 }
@@ -111,19 +111,22 @@ impl Player {
 
         // 3. Aiming: Continuously face mouse cursor using 8-direction hysteresis
         if !self.is_rolling && input.mouse_ever_detected {
-            let aim_dx = input.mouse_world_pos.0 - self.x;
-            let aim_dy = input.mouse_world_pos.1 - self.y;
-            let (new_dir, new_flip) = update_direction_hysteresis(
-                aim_dx,
-                aim_dy,
-                &mut self.facing_angle,
-            );
-            self.dir4 = new_dir;
-            self.flip_x = new_flip;
+            let aim_dx = mouse_world.0 - self.x;
+            let aim_dy = mouse_world.1 - self.y;
+            // Ignore tiny mouse jitter within 12px deadzone
+            if aim_dx * aim_dx + aim_dy * aim_dy >= 144.0 {
+                let (new_dir, new_flip) = update_direction_hysteresis(
+                    aim_dx,
+                    aim_dy,
+                    &mut self.facing_angle,
+                );
+                self.dir4 = new_dir;
+                self.flip_x = new_flip;
+            }
         }
 
-        // 4. Trigger Dodge Roll
-        let wants_roll = (input.mouse_right_just_pressed || input.just_pressed(VirtualKey::Space) || self.roll_buffered)
+        // 4. Trigger Dodge Roll (Space only)
+        let wants_roll = (input.just_pressed(VirtualKey::Space) || self.roll_buffered)
             && self.roll_cooldown <= 0.0;
 
         if wants_roll {
@@ -132,11 +135,21 @@ impl Player {
             self.roll_timer = ROLL_DURATION;
             self.roll_cooldown = ROLL_COOLDOWN;
 
-            // Aim direction towards mouse
-            let aim_dx = input.mouse_world_pos.0 - self.x;
-            let aim_dy = input.mouse_world_pos.1 - self.y;
-            let aim_len = (aim_dx * aim_dx + aim_dy * aim_dy).sqrt().max(0.001);
-            self.roll_dir = (aim_dx / aim_len, aim_dy / aim_len);
+            let (key_dx, key_dy) = input.movement_vector();
+            let aim_dx = mouse_world.0 - self.x;
+            let aim_dy = mouse_world.1 - self.y;
+            let aim_len_sq = aim_dx * aim_dx + aim_dy * aim_dy;
+
+            // If mouse cursor is detected and outside deadzone, roll toward mouse;
+            // otherwise roll in movement direction if WASD is pressed, or current facing direction.
+            if input.mouse_ever_detected && aim_len_sq >= 144.0 {
+                let aim_len = aim_len_sq.sqrt();
+                self.roll_dir = (aim_dx / aim_len, aim_dy / aim_len);
+            } else if key_dx != 0.0 || key_dy != 0.0 {
+                self.roll_dir = (key_dx, key_dy);
+            } else {
+                self.roll_dir = (self.facing_angle.cos(), self.facing_angle.sin());
+            }
 
             // Lock facing direction to roll direction
             let (r_dir, r_flip) = update_direction_hysteresis(
@@ -176,12 +189,12 @@ impl Player {
                     self.y += move_y;
                 }
 
-                // Animation & dust
-                self.anim_timer += dt * 18.0;
-                self.anim_frame = (self.anim_timer as usize) % 4;
+                // Animation & dust: 7-frame roll cycle
+                let roll_progress = (1.0 - (self.roll_timer / ROLL_DURATION)).clamp(0.0, 0.99);
+                self.anim_frame = (roll_progress * 7.0) as usize;
 
                 self.dust_timer += dt;
-                if self.dust_timer > 0.06 {
+                if self.dust_timer > 0.05 {
                     self.dust_timer = 0.0;
                     self.roll_ghosts.push((self.x, self.y, 0.75, self.dir4, self.flip_x));
                     particles.spawn_dust(self.x, self.y);
@@ -203,9 +216,9 @@ impl Player {
         let target_vx = key_dx * max_speed;
         let target_vy = key_dy * max_speed;
 
-        // Acceleration rate (~0.12s to full speed) and deceleration rate (~0.08s to stop)
-        let accel_rate = max_speed / 0.12;
-        let decel_rate = max_speed / 0.08;
+        // Snappy, agile acceleration (~0.07s to full speed) and responsive stop (~0.04s)
+        let accel_rate = max_speed / 0.07;
+        let decel_rate = max_speed / 0.04;
 
         let rate_x = if target_vx.abs() > self.vx.abs() { accel_rate } else { decel_rate };
         let rate_y = if target_vy.abs() > self.vy.abs() { accel_rate } else { decel_rate };
@@ -221,24 +234,24 @@ impl Player {
             let move_y = self.vy * dt;
 
             // Separate X and Y collision sliding against colliders
-            let test_x_col = Collider::new(self.x + move_x - 5.0, self.y - 3.0, 10.0, 6.0);
+            let test_x_col = Collider::new(self.x + move_x - 6.0, self.y - 4.0, 12.0, 8.0);
             if !world.check_collision(&test_x_col) {
                 self.x += move_x;
             } else {
                 self.vx = 0.0;
             }
 
-            let test_y_col = Collider::new(self.x - 5.0, self.y + move_y - 3.0, 10.0, 6.0);
+            let test_y_col = Collider::new(self.x - 6.0, self.y + move_y - 4.0, 12.0, 8.0);
             if !world.check_collision(&test_y_col) {
                 self.y += move_y;
             } else {
                 self.vy = 0.0;
             }
 
-            // Walk animation speed proportional to actual velocity
+            // Walk animation speed proportional to actual velocity (6-frame walk cycle)
             let anim_speed_factor = (current_speed / PLAYER_WALK_SPEED).clamp(0.5, 2.0);
-            self.anim_timer += dt * 10.0 * anim_speed_factor;
-            self.anim_frame = (self.anim_timer as usize) % 4;
+            self.anim_timer += dt * 9.0 * anim_speed_factor;
+            self.anim_frame = (self.anim_timer as usize) % 6;
 
             self.dust_timer += dt;
             let dust_interval = if self.is_running { 0.15 } else { 0.25 };
@@ -247,32 +260,33 @@ impl Player {
                 particles.spawn_dust(self.x + if self.flip_x { 2.0 } else { -2.0 }, self.y);
             }
         } else {
-            self.anim_timer += dt * 3.0;
-            self.anim_frame = 0;
+            // Idle breathing animation (4-frame cycle, ~1.6s per breath)
+            self.anim_timer += dt * 2.5;
+            self.anim_frame = (self.anim_timer as usize) % 4;
             self.dust_timer = 0.0;
         }
     }
 
     pub fn draw(&self, fb: &mut Framebuffer, bank: &SpriteBank, cam_x: i32, cam_y: i32) {
-        let draw_x = (self.x - 8.0).round() as i32 - cam_x;
-        let draw_y = (self.y - 20.0).round() as i32 - cam_y;
+        let draw_x = (self.x - 9.0).round() as i32 - cam_x;
+        let draw_y = (self.y - 28.0).round() as i32 - cam_y;
 
         // 1. Contact shadow ellipse under character feet
-        let shadow_cx = draw_x + 8;
-        let shadow_cy = draw_y + 20;
-        fb.draw_ellipse(shadow_cx, shadow_cy, 6, 2, Color::rgba(5, 6, 12, 130));
+        let shadow_cx = draw_x + 9;
+        let shadow_cy = draw_y + 28;
+        fb.draw_ellipse(shadow_cx, shadow_cy, 7, 3, Color::rgba(5, 6, 12, 140));
 
         // 2. Draw dash roll motion blur ghost trails
         for &(gx, gy, glife, gdir, gflip) in &self.roll_ghosts {
-            let g_sx = (gx - 8.0).round() as i32 - cam_x;
-            let g_sy = (gy - 20.0).round() as i32 - cam_y;
+            let g_sx = (gx - 9.0).round() as i32 - cam_x;
+            let g_sy = (gy - 28.0).round() as i32 - cam_y;
             let g_dir_idx = match gdir {
                 Direction4::South => 0,
                 Direction4::North => 1,
                 Direction4::East => 2,
                 Direction4::SouthEast => 3,
             };
-            let body = &bank.body_idle[g_dir_idx];
+            let body = &bank.body_roll[g_dir_idx][2];
             let alpha = (glife * 110.0).clamp(0.0, 255.0) as u8;
             body.draw_alpha(fb, g_sx, g_sy, gflip, alpha);
         }
@@ -285,17 +299,22 @@ impl Player {
         };
 
         // 3. Base Body sprite
-        let body_sprite = if self.is_moving || self.is_rolling {
-            &bank.body_walk[dir_idx][self.anim_frame]
+        let body_sprite = if self.is_rolling {
+            &bank.body_roll[dir_idx][self.anim_frame % 7]
+        } else if self.is_moving {
+            &bank.body_walk[dir_idx][self.anim_frame % 6]
         } else {
-            &bank.body_idle[dir_idx]
+            &bank.body_idle[dir_idx][self.anim_frame % 4]
         };
 
         // 4. Cosmetic i-frame glow during roll
         if self.is_rolling {
             let glow_alpha = ((self.roll_timer / ROLL_DURATION) * 70.0) as u8;
             let glow_col = Color::rgba(255, 230, 180, glow_alpha);
-            fb.draw_circle(shadow_cx, shadow_cy - 10, 12, glow_col, false);
+            fb.draw_circle(shadow_cx, shadow_cy - 12, 12, glow_col, false);
+            // Draw dedicated athletic roll tumble
+            body_sprite.draw(fb, draw_x, draw_y, self.flip_x);
+            return;
         }
 
         // 5. Layered gear composite rendering

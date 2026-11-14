@@ -2,7 +2,7 @@ use crate::assets::palette::Palette;
 use crate::assets::sprites::{Sprite, SpriteBank};
 use crate::engine::color::Color;
 use crate::engine::framebuffer::Framebuffer;
-use crate::engine::lighting::ShadowCaster;
+use crate::engine::lighting::{PointLight, ShadowCaster};
 use crate::engine::pathfinding::NavGrid;
 
 #[derive(Debug, Clone, Copy)]
@@ -33,7 +33,7 @@ pub struct PropInstance {
     pub sprite_index: PropType,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PropType {
     ColosseumArch,
     BrokenColumn,
@@ -43,6 +43,114 @@ pub enum PropType {
     SpectatorStand,
     TatteredBanner,
     BonePile,
+    HeadlessGladiator,
+    HangingCage,
+    WallTorch,
+    FallenArchRubble,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TorchConfig {
+    pub x: f32,
+    pub y: f32,
+    pub radius: f32,
+    pub intensity: f32,
+    pub color: (u8, u8, u8),
+    pub flicker: f32,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LightShaftConfig {
+    pub start_x: f32,
+    pub start_y: f32,
+    pub end_x: f32,
+    pub end_y: f32,
+    pub width: f32,
+    pub alpha: u8,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PropConfig {
+    pub x: i32,
+    pub y: i32,
+    pub prop_type: PropType,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ColosseumConfig {
+    pub width: usize,
+    pub height: usize,
+    pub ambient_color: (u8, u8, u8),
+    pub dais_radius_x: f32,
+    pub dais_radius_y: f32,
+    pub step_count: usize,
+    pub gate_x: f32,
+    pub gate_y: f32,
+    pub torches: Vec<TorchConfig>,
+    pub light_shafts: Vec<LightShaftConfig>,
+    pub props: Vec<PropConfig>,
+}
+
+impl ColosseumConfig {
+    pub fn load() -> Self {
+        if let Some(cfg) = std::fs::read_to_string("data/colosseum.ron")
+            .ok()
+            .and_then(|content| ron::from_str::<ColosseumConfig>(&content).ok())
+        {
+            return cfg;
+        }
+        Self::fallback_default()
+    }
+
+    pub fn fallback_default() -> Self {
+        Self {
+            width: 280,
+            height: 190,
+            ambient_color: (44, 50, 68),
+            dais_radius_x: 24.0,
+            dais_radius_y: 16.0,
+            step_count: 3,
+            gate_x: 124.0,
+            gate_y: 18.0,
+            torches: vec![
+                TorchConfig {
+                    x: 104.0,
+                    y: 40.0,
+                    radius: 46.0,
+                    intensity: 0.85,
+                    color: (255, 160, 45),
+                    flicker: 0.10,
+                },
+                TorchConfig {
+                    x: 176.0,
+                    y: 40.0,
+                    radius: 46.0,
+                    intensity: 0.85,
+                    color: (255, 160, 45),
+                    flicker: 0.10,
+                },
+            ],
+            light_shafts: vec![
+                LightShaftConfig {
+                    start_x: 75.0,
+                    start_y: 0.0,
+                    end_x: 110.0,
+                    end_y: 130.0,
+                    width: 22.0,
+                    alpha: 24,
+                },
+                LightShaftConfig {
+                    start_x: 155.0,
+                    start_y: 0.0,
+                    end_x: 185.0,
+                    end_y: 140.0,
+                    width: 26.0,
+                    alpha: 28,
+                },
+            ],
+            props: vec![],
+        }
+    }
 }
 
 pub struct World {
@@ -52,39 +160,59 @@ pub struct World {
     pub props: Vec<PropInstance>,
     pub colliders: Vec<Collider>,
     pub nav_grid: NavGrid,
+    pub torch_lights: Vec<PointLight>,
+    pub light_shafts: Vec<LightShaftConfig>,
 }
 
 impl World {
     pub fn build(width: usize, height: usize) -> Self {
-        let mut ground_pixels = vec![Palette::VOID_BLACK; width * height];
-        let mut props = Vec::with_capacity(36);
-        let mut colliders = Vec::with_capacity(48);
-        let mut nav_grid = NavGrid::new(width as f32, height as f32, 4.0);
+        let config = ColosseumConfig::load();
+        let eff_w = config.width.max(width);
+        let eff_h = config.height.max(height);
 
-        let cx = width as f32 * 0.5;
-        let cy = height as f32 * 0.5;
-        let arena_rx = width as f32 * 0.44;
-        let arena_ry = height as f32 * 0.38;
+        let mut ground_pixels = vec![Palette::VOID_BLACK; eff_w * eff_h];
+        let mut props = Vec::with_capacity(config.props.len() + 16);
+        let mut colliders = Vec::with_capacity(config.props.len() + 32);
+        let mut nav_grid = NavGrid::new(eff_w as f32, eff_h as f32, 4.0);
 
-        // Generate elliptical Ashen Colosseum floor
-        for y in 0..height {
+        let cx = eff_w as f32 * 0.5;
+        let cy = eff_h as f32 * 0.5;
+        let arena_rx = eff_w as f32 * 0.44;
+        let arena_ry = eff_h as f32 * 0.38;
+
+        // 1. Generate Rich Elliptical Colosseum Floor with multi-tone shading
+        for y in 0..eff_h {
             let dy = (y as f32 - cy) / arena_ry;
-            let row_offset = y * width;
+            let row_offset = y * eff_w;
 
-            for x in 0..width {
+            for x in 0..eff_w {
                 let dx = (x as f32 - cx) / arena_rx;
                 let dist2 = dx * dx + dy * dy;
 
                 let col = if dist2 < 0.85 {
-                    // Sand arena floor with blood stains & broken stone pavers
-                    let noise = ((x * 19 + y * 37) ^ ((x >> 2) + (y >> 2))) % 71;
-                    let blood = ((x * 23 + y * 47) % 89) == 0 && (dist2 > 0.25 && dist2 < 0.75);
+                    // Interior Arena Floor
+                    let noise = ((x * 19 + y * 37) ^ ((x >> 2) + (y >> 2))) % 79;
+                    let blood = ((x * 23 + y * 47) % 97) == 0 && (dist2 > 0.28 && dist2 < 0.72);
                     let flagstone = ((x / 14 + y / 10) % 5 == 0) && (x % 14 > 1 && y % 10 > 1);
 
-                    if blood {
+                    // Puddles reflecting firelight near perimeter
+                    let is_puddle = ((x as i32 - (cx as i32 - 45)).pow(2)
+                        + (y as i32 - (cy as i32 + 25)).pow(2) * 2) < 32
+                        || ((x as i32 - (cx as i32 + 52)).pow(2)
+                            + (y as i32 - (cy as i32 - 18)).pow(2) * 2) < 26;
+
+                    if is_puddle {
+                        if (x + y) % 3 == 0 {
+                            Palette::PUDDLE_REFLECT
+                        } else {
+                            Palette::PUDDLE_WATER
+                        }
+                    } else if blood {
                         Palette::BLOOD_STAIN
                     } else if flagstone {
-                        if (x + y) % 2 == 0 {
+                        if (x + y) % 3 == 0 {
+                            Palette::STONE_WARM_MID
+                        } else if (x + y) % 2 == 0 {
                             Palette::CAVEA_STONE_MID
                         } else {
                             Palette::CAVEA_STONE_DARK
@@ -97,15 +225,18 @@ impl World {
                         Palette::ARENA_SAND_DARK
                     }
                 } else if dist2 < 0.95 {
-                    // Chiseled Roman stone rim
-                    if (x / 8 + y / 8) % 2 == 0 {
+                    // Chiseled Roman stone rim with moss growth
+                    let is_moss = (x * 7 + y * 13) % 29 == 0;
+                    if is_moss {
+                        Palette::MOSS_GREEN_MID
+                    } else if (x / 8 + y / 8) % 2 == 0 {
                         Palette::CAVEA_STONE_LIGHT
                     } else {
                         Palette::CAVEA_STONE_MID
                     }
                 } else if dist2 < 1.05 {
-                    // Cavea tiers base shadow
-                    Palette::CAVEA_STONE_DARK
+                    // Cavea tiers base shadow (cool blue-black)
+                    Palette::STONE_COOL_DARK
                 } else {
                     // Outer darkness / spectator void
                     Palette::VOID_BLACK
@@ -115,27 +246,83 @@ impl World {
             }
         }
 
-        // Central raised stone dais around bonfire
-        for y in (cy as usize - 14)..=(cy as usize + 14) {
-            let dy = (y as f32 - cy) / 14.0;
-            let row_offset = y * width;
-            for x in (cx as usize - 22)..=(cx as usize + 22) {
-                let dx = (x as f32 - cx) / 22.0;
-                let d2 = dx * dx + dy * dy;
-                if d2 <= 1.0 {
-                    let is_rim = d2 > 0.82;
-                    ground_pixels[row_offset + x] = if is_rim {
-                        Palette::CAVEA_STONE_LIGHT
-                    } else if (x + y) % 3 == 0 {
-                        Palette::STONE_CRACK
-                    } else {
+        // 2. Visible Paved Cobblestone Path from Bonfire North to Gate of Trials
+        let path_half_w = 7;
+        let gate_top_y = config.gate_y as usize;
+        let bonfire_y = cy as usize;
+        for y in gate_top_y..=bonfire_y {
+            let row_offset = y * eff_w;
+            for x in (cx as usize - path_half_w)..=(cx as usize + path_half_w) {
+                let dist_from_center = (x as i32 - cx as i32).abs();
+                if dist_from_center == path_half_w as i32 {
+                    // Curb stones with warm highlight
+                    ground_pixels[row_offset + x] = Palette::STONE_WARM_LIGHT;
+                } else if dist_from_center == path_half_w as i32 - 1 {
+                    ground_pixels[row_offset + x] = Palette::STONE_WARM_MID;
+                } else {
+                    // Paved dark flagstone interior
+                    ground_pixels[row_offset + x] = if (x + y) % 2 == 0 {
                         Palette::CAVEA_STONE_MID
+                    } else {
+                        Palette::CAVEA_STONE_DARK
                     };
                 }
             }
         }
 
-        // Perimeter colliders around the edge of the Colosseum arena
+        // 3. Central Raised Stone Dais with 3 Concentric Steps
+        let dais_rx = config.dais_radius_x;
+        let dais_ry = config.dais_radius_y;
+        let dais_min_y = (cy - dais_ry - 4.0).max(0.0) as usize;
+        let dais_max_y = (cy + dais_ry + 4.0).min(eff_h as f32 - 1.0) as usize;
+        let dais_min_x = (cx - dais_rx - 4.0).max(0.0) as usize;
+        let dais_max_x = (cx + dais_rx + 4.0).min(eff_w as f32 - 1.0) as usize;
+
+        for y in dais_min_y..=dais_max_y {
+            let dy = (y as f32 - cy) / dais_ry;
+            let row_offset = y * eff_w;
+            for x in dais_min_x..=dais_max_x {
+                let dx = (x as f32 - cx) / dais_rx;
+                let d2 = dx * dx + dy * dy;
+
+                if d2 <= 1.05 {
+                    let col = if d2 > 0.85 {
+                        // Step 3 (Outer step riser)
+                        if (x + y) % 2 == 0 {
+                            Palette::STONE_WARM_LIGHT
+                        } else {
+                            Palette::STONE_COOL_DARK
+                        }
+                    } else if d2 > 0.60 {
+                        // Step 2 (Middle tread)
+                        if (x + y) % 3 == 0 {
+                            Palette::STONE_WARM_MID
+                        } else {
+                            Palette::CAVEA_STONE_MID
+                        }
+                    } else if d2 > 0.25 {
+                        // Step 1 (Inner dais platform)
+                        if (x + y) % 4 == 0 {
+                            Palette::STONE_CRACK
+                        } else {
+                            Palette::CAVEA_STONE_LIGHT
+                        }
+                    } else {
+                        // Center Bonfire Hearth (Charred ashes & cracked slate)
+                        if (x + y) % 3 == 0 {
+                            Palette::STONE_CRACK
+                        } else if (x + y) % 2 == 0 {
+                            Palette::STONE_DARK
+                        } else {
+                            Palette::ASH_WHITE
+                        }
+                    };
+                    ground_pixels[row_offset + x] = col;
+                }
+            }
+        }
+
+        // 4. Perimeter Rim Colliders
         let num_rim_colliders = 28;
         for i in 0..num_rim_colliders {
             let angle = (i as f32 / num_rim_colliders as f32) * std::f32::consts::TAU;
@@ -145,124 +332,36 @@ impl World {
             colliders.push(col);
         }
 
-        // 1. Gate of Trials (North edge exit)
-        let gate_x = cx as i32 - 16;
-        let gate_y = (cy - arena_ry + 4.0) as i32;
-        props.push(PropInstance {
-            x: gate_x,
-            y: gate_y,
-            base_y: gate_y + 32,
-            sprite_index: PropType::GateOfTrials,
-        });
-        colliders.push(Collider::new(gate_x as f32 + 2.0, gate_y as f32 + 20.0, 28.0, 12.0));
+        // 5. Instantiate Props from Config with non-trapping footprints
+        for p in &config.props {
+            let (w, _h, base_off, col_w, col_h, has_col) = match p.prop_type {
+                PropType::GateOfTrials => (32, 34, 32, 28.0, 12.0, true),
+                PropType::ColosseumArch => (32, 36, 34, 24.0, 12.0, true),
+                PropType::BrokenColumn => (12, 26, 24, 8.0, 6.0, true),
+                PropType::WeaponRack => (18, 20, 18, 14.0, 8.0, true),
+                PropType::TrainingDummy => (12, 20, 18, 8.0, 8.0, true),
+                PropType::SpectatorStand => (28, 18, 16, 24.0, 10.0, true),
+                PropType::TatteredBanner => (14, 30, 28, 4.0, 6.0, true),
+                PropType::BonePile => (12, 10, 8, 0.0, 0.0, false), // Walkable!
+                PropType::HeadlessGladiator => (16, 28, 26, 10.0, 8.0, true),
+                PropType::HangingCage => (14, 24, 20, 8.0, 6.0, true),
+                PropType::WallTorch => (8, 14, 12, 0.0, 0.0, false), // Mounted on wall!
+                PropType::FallenArchRubble => (20, 12, 10, 16.0, 8.0, true),
+            };
 
-        // 2. Colosseum Arches (Upper cavea rim)
-        let arch_coords = [
-            (cx as i32 - 82, (cy - arena_ry * 0.65) as i32),
-            (cx as i32 - 50, (cy - arena_ry * 0.88) as i32),
-            (cx as i32 + 22, (cy - arena_ry * 0.88) as i32),
-            (cx as i32 + 54, (cy - arena_ry * 0.65) as i32),
-        ];
-        for &(ax, ay) in &arch_coords {
+            let base_y = p.y + base_off;
             props.push(PropInstance {
-                x: ax,
-                y: ay,
-                base_y: ay + 34,
-                sprite_index: PropType::ColosseumArch,
+                x: p.x,
+                y: p.y,
+                base_y,
+                sprite_index: p.prop_type,
             });
-            colliders.push(Collider::new(ax as f32 + 4.0, ay as f32 + 22.0, 24.0, 12.0));
-        }
 
-        // 3. Spectator Stands (Tiers behind arches)
-        let stands = [
-            (cx as i32 - 105, (cy - arena_ry * 0.35) as i32),
-            (cx as i32 + 80, (cy - arena_ry * 0.35) as i32),
-        ];
-        for &(sx, sy) in &stands {
-            props.push(PropInstance {
-                x: sx,
-                y: sy,
-                base_y: sy + 16,
-                sprite_index: PropType::SpectatorStand,
-            });
-            colliders.push(Collider::new(sx as f32 + 2.0, sy as f32 + 8.0, 24.0, 10.0));
-        }
-
-        // 4. Broken Columns (Shattered Roman columns)
-        let columns = [
-            (cx as i32 - 62, cy as i32 + 24),
-            (cx as i32 + 58, cy as i32 + 20),
-            (cx as i32 - 84, cy as i32 + 5),
-            (cx as i32 + 76, cy as i32 + 8),
-            (cx as i32 - 32, cy as i32 + 36),
-            (cx as i32 + 28, cy as i32 + 36),
-        ];
-        for &(col_x, col_y) in &columns {
-            props.push(PropInstance {
-                x: col_x,
-                y: col_y - 20,
-                base_y: col_y + 4,
-                sprite_index: PropType::BrokenColumn,
-            });
-            colliders.push(Collider::new(col_x as f32 + 2.0, col_y as f32 - 2.0, 8.0, 8.0));
-        }
-
-        // 5. Weapon Racks
-        let weapon_racks = [
-            (cx as i32 - 42, cy as i32 - 18),
-            (cx as i32 + 36, cy as i32 + 18),
-        ];
-        for &(wx, wy) in &weapon_racks {
-            props.push(PropInstance {
-                x: wx,
-                y: wy - 16,
-                base_y: wy + 2,
-                sprite_index: PropType::WeaponRack,
-            });
-            colliders.push(Collider::new(wx as f32 + 2.0, wy as f32 - 4.0, 14.0, 8.0));
-        }
-
-        // 6. Training Dummy
-        let dummy_pos = (cx as i32 - 58, cy as i32 - 16);
-        props.push(PropInstance {
-            x: dummy_pos.0,
-            y: dummy_pos.1 - 20,
-            base_y: dummy_pos.1 + 2,
-            sprite_index: PropType::TrainingDummy,
-        });
-        colliders.push(Collider::new(dummy_pos.0 as f32 + 2.0, dummy_pos.1 as f32 - 4.0, 10.0, 8.0));
-
-        // 7. Tattered Banners
-        let banners = [
-            (gate_x - 12, gate_y + 6),
-            (gate_x + 36, gate_y + 6),
-            (cx as i32 - 94, cy as i32 + 16),
-            (cx as i32 + 88, cy as i32 + 16),
-        ];
-        for &(bx, by) in &banners {
-            props.push(PropInstance {
-                x: bx,
-                y: by,
-                base_y: by + 28,
-                sprite_index: PropType::TatteredBanner,
-            });
-            colliders.push(Collider::new(bx as f32 + 2.0, by as f32 + 22.0, 4.0, 6.0));
-        }
-
-        // 8. Bone Piles
-        let bone_piles = [
-            (cx as i32 - 70, cy as i32 + 32),
-            (cx as i32 + 64, cy as i32 + 30),
-            (cx as i32 + 24, cy as i32 - 28),
-            (cx as i32 - 44, cy as i32 + 34),
-        ];
-        for &(bx, by) in &bone_piles {
-            props.push(PropInstance {
-                x: bx,
-                y: by - 6,
-                base_y: by + 2,
-                sprite_index: PropType::BonePile,
-            });
+            if has_col {
+                let cx_box = p.x as f32 + (w as f32 - col_w) * 0.5;
+                let cy_box = (base_y as f32) - col_h * 0.5;
+                colliders.push(Collider::new(cx_box, cy_box, col_w, col_h));
+            }
         }
 
         // Build NavGrid blocked cells from all colliders and arena perimeter
@@ -270,7 +369,6 @@ impl World {
             nav_grid.set_blocked_rect(c.x, c.y, c.x + c.w, c.y + c.h);
         }
 
-        // Also block cells outside the arena ellipse
         for r in 0..nav_grid.rows {
             let wy = (r as f32 + 0.5) * nav_grid.cell_size;
             let dy = (wy - cy) / arena_ry;
@@ -283,13 +381,28 @@ impl World {
             }
         }
 
+        // 6. Convert Torch Config to PointLights
+        let mut torch_lights = Vec::with_capacity(config.torches.len());
+        for t in &config.torches {
+            torch_lights.push(PointLight {
+                x: t.x,
+                y: t.y,
+                radius: t.radius,
+                intensity: t.intensity,
+                color: Color::rgb(t.color.0, t.color.1, t.color.2),
+                flicker_amount: t.flicker,
+            });
+        }
+
         Self {
-            width,
-            height,
+            width: eff_w,
+            height: eff_h,
             ground_pixels,
             props,
             colliders,
             nav_grid,
+            torch_lights,
+            light_shafts: config.light_shafts,
         }
     }
 
@@ -309,6 +422,46 @@ impl World {
             }
         }
         false
+    }
+
+    /// Draws volumetric light shafts streaming down through the broken colosseum ceiling.
+    pub fn draw_light_shafts(&self, fb: &mut Framebuffer, cam_x: i32, cam_y: i32, time_secs: f32) {
+        let pulse = (time_secs * 1.5).sin() * 0.15 + 0.85;
+        let shaft_color = Color::rgb(180, 205, 245);
+
+        for shaft in &self.light_shafts {
+            let start_scr_x = shaft.start_x - cam_x as f32;
+            let start_scr_y = shaft.start_y - cam_y as f32;
+            let end_scr_x = shaft.end_x - cam_x as f32;
+            let end_scr_y = shaft.end_y - cam_y as f32;
+
+            let dy = end_scr_y - start_scr_y;
+            if dy <= 0.0 {
+                continue;
+            }
+
+            let y_start = (start_scr_y.max(0.0)).round() as i32;
+            let y_end = (end_scr_y.min(fb.height as f32)).round() as i32;
+
+            for y in y_start..y_end {
+                let t = (y as f32 - start_scr_y) / dy;
+                let center_x = start_scr_x + (end_scr_x - start_scr_x) * t;
+                let half_w = (shaft.width * (0.6 + t * 0.4)) * 0.5;
+                let alpha_base = (shaft.alpha as f32 * pulse * (1.0 - t * 0.35)) as u8;
+
+                let x_min = ((center_x - half_w).max(0.0)).round() as i32;
+                let x_max = ((center_x + half_w).min(fb.width as f32)).round() as i32;
+
+                for x in x_min..x_max {
+                    let dist_norm = ((x as f32 - center_x) / half_w).abs().min(1.0);
+                    let edge_falloff = (1.0 - dist_norm * dist_norm).max(0.0);
+                    let a = (alpha_base as f32 * edge_falloff) as u8;
+                    if a > 0 {
+                        fb.set_pixel_add(x, y, shaft_color.scale(a as f32 / 255.0));
+                    }
+                }
+            }
+        }
     }
 
     /// Draws the parallax background sky, distant red moon, and Colosseum ruins silhouette.
@@ -383,6 +536,10 @@ impl World {
                 PropType::SpectatorStand => (26.0, 16.0),
                 PropType::TatteredBanner => (6.0, 24.0),
                 PropType::BonePile => (10.0, 8.0),
+                PropType::HeadlessGladiator => (14.0, 22.0),
+                PropType::HangingCage => (12.0, 18.0),
+                PropType::WallTorch => (6.0, 10.0),
+                PropType::FallenArchRubble => (18.0, 10.0),
             };
             casters.push(ShadowCaster {
                 x: p.x as f32 + w * 0.5,
@@ -410,6 +567,10 @@ impl World {
             PropType::SpectatorStand => &bank.spectator_stand,
             PropType::TatteredBanner => &bank.tattered_banner[banner_frame % 2],
             PropType::BonePile => &bank.bone_pile,
+            PropType::HeadlessGladiator => &bank.headless_gladiator,
+            PropType::HangingCage => &bank.hanging_cage,
+            PropType::WallTorch => &bank.wall_torch[banner_frame % 2],
+            PropType::FallenArchRubble => &bank.fallen_arch_rubble,
         }
     }
 }

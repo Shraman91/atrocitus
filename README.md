@@ -31,18 +31,22 @@
 
 | Input | Action |
 |---|---|
-| **W, A, S, D** | Smooth Character Movement (with X/Y wall sliding) |
-| **Mouse Cursor** | Aim Facing Direction (Continuous 8-directional hysteresis) |
-| **Space** / **Right-Click** | Eased Dodge Roll toward Cursor (i-frame glow + ghost trails) |
-| **E** / **Left-Click** | Interact with NPCs, Bonfire, or examine Gate |
+| **W, A, S, D** | Smooth Character Movement (with X/Y wall collision sliding) |
+| **Mouse Cursor** | Aim Character Facing (Continuous 8-directional hysteresis) |
+| **LMB** | Primary Attack / UI Selection |
+| **RMB** | Class Secondary Ability (Block, Nova, Shadowstep, Flintlock, Eye) |
+| **Space** | Eased Dodge Roll toward Cursor (i-frame glow + ghost trails) |
+| **E** / **Left-Click** | Interact with NPCs, Bonfire, Gate / Consume Corpse (Mage) |
 | **M** | Toggle Colosseum Map (Fog-of-war & entity radar) |
 | **B** | Toggle Backpack / Inventory (5×4 grid & gear inspection) |
 | **K** | Toggle Spellbook (Mage incantations & catalysts) |
 | **F1** or **H** | Toggle Controls Hint HUD |
 | **F2** | Toggle UI Layout Debug Bounding Boxes |
-| **F3** | Toggle Debug Overlay (Coordinates, Camera, Colliders) |
+| **F3** | Toggle FPS / Debug Overlay (Coordinates, Camera, Colliders) |
 | **F4** | Open Fullscreen Sprite Gallery (1x & 3x scale viewer) |
 | **F5** | Debug: Populate Backpack with 8 Test Items |
+| **F6** | Debug: Toggle Hitbox / Hurtbox Overlay |
+| **F7** | Debug: Spawn Enemy at Cursor |
 | **F9** | Debug: Reset Class / Mantle |
 | **Esc** | Pause Menu / Back / Close Overlays |
 

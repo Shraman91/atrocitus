@@ -1,0 +1,129 @@
+ColosseumConfig(
+    width: 280,
+    height: 190,
+    ambient_color: (44, 50, 68), // Soft blue-moon ambient floor (>= 35%)
+    
+    // Central Dais & Steps
+    dais_radius_x: 24.0,
+    dais_radius_y: 16.0,
+    step_count: 3,
+
+    // Gate of Trials (North edge exit)
+    gate_x: 124.0,
+    gate_y: 18.0,
+
+    // Torches (wall sconces & dais braziers providing secondary point lights)
+    torches: [
+        // Sconces flanking the northern Gate of Trials
+        (
+            x: 104.0,
+            y: 40.0,
+            radius: 46.0,
+            intensity: 0.85,
+            color: (255, 160, 45),
+            flicker: 0.10,
+        ),
+        (
+            x: 176.0,
+            y: 40.0,
+            radius: 46.0,
+            intensity: 0.85,
+            color: (255, 160, 45),
+            flicker: 0.10,
+        ),
+        // Western cavea wall torch (illuminating path near Blacksmith)
+        (
+            x: 82.0,
+            y: 92.0,
+            radius: 42.0,
+            intensity: 0.80,
+            color: (255, 150, 40),
+            flicker: 0.09,
+        ),
+        // Eastern cavea wall torch (illuminating path near Witch)
+        (
+            x: 198.0,
+            y: 98.0,
+            radius: 42.0,
+            intensity: 0.80,
+            color: (255, 150, 40),
+            flicker: 0.09,
+        ),
+        // Southern perimeter torch
+        (
+            x: 140.0,
+            y: 154.0,
+            radius: 44.0,
+            intensity: 0.75,
+            color: (255, 155, 42),
+            flicker: 0.08,
+        ),
+    ],
+
+    // Roof light shafts (volumetric rays cutting through collapsed roof)
+    light_shafts: [
+        (start_x: 75.0, start_y: 0.0, end_x: 110.0, end_y: 130.0, width: 22.0, alpha: 24),
+        (start_x: 155.0, start_y: 0.0, end_x: 185.0, end_y: 140.0, width: 26.0, alpha: 28),
+    ],
+
+    // Props layout with non-trapping generous clearance
+    props: [
+        // Gate of Trials
+        (x: 124, y: 14, prop_type: GateOfTrials),
+
+        // Arches on upper cavea tiers
+        (x: 58, y: 32, prop_type: ColosseumArch),
+        (x: 90, y: 18, prop_type: ColosseumArch),
+        (x: 162, y: 18, prop_type: ColosseumArch),
+        (x: 194, y: 32, prop_type: ColosseumArch),
+
+        // Spectator stands
+        (x: 35, y: 64, prop_type: SpectatorStand),
+        (x: 220, y: 64, prop_type: SpectatorStand),
+
+        // Headless Gladiator Statues (grand statues flanking the dais and avenues)
+        (x: 96, y: 72, prop_type: HeadlessGladiator),
+        (x: 184, y: 72, prop_type: HeadlessGladiator),
+
+        // Hanging Gibbet Cages near outer ruins
+        (x: 48, y: 92, prop_type: HangingCage),
+        (x: 228, y: 92, prop_type: HangingCage),
+
+        // Wall Torches mounted on stone pillars
+        (x: 104, y: 34, prop_type: WallTorch),
+        (x: 176, y: 34, prop_type: WallTorch),
+        (x: 82, y: 86, prop_type: WallTorch),
+        (x: 198, y: 92, prop_type: WallTorch),
+        (x: 140, y: 148, prop_type: WallTorch),
+
+        // Broken Columns (strategically positioned away from walking paths)
+        (x: 74, y: 120, prop_type: BrokenColumn),
+        (x: 206, y: 118, prop_type: BrokenColumn),
+        (x: 112, y: 144, prop_type: BrokenColumn),
+        (x: 168, y: 144, prop_type: BrokenColumn),
+
+        // Fallen Arch Rubble
+        (x: 64, y: 56, prop_type: FallenArchRubble),
+        (x: 204, y: 56, prop_type: FallenArchRubble),
+
+        // Weapon Racks (near Blacksmith & arena edge)
+        (x: 96, y: 106, prop_type: WeaponRack),
+        (x: 184, y: 112, prop_type: WeaponRack),
+
+        // Training Dummy
+        (x: 80, y: 110, prop_type: TrainingDummy),
+
+        // Swaying Tattered Banners
+        (x: 112, y: 20, prop_type: TatteredBanner),
+        (x: 160, y: 20, prop_type: TatteredBanner),
+        (x: 46, y: 112, prop_type: TatteredBanner),
+        (x: 226, y: 112, prop_type: TatteredBanner),
+
+        // Gladiator Bone Piles
+        (x: 68, y: 132, prop_type: BonePile),
+        (x: 212, y: 130, prop_type: BonePile),
+        (x: 126, y: 156, prop_type: BonePile),
+        (x: 154, y: 156, prop_type: BonePile),
+    ],
+)
+

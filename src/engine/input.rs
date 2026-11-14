@@ -4,8 +4,44 @@ use crossterm::event::{
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
-const FIRST_PRESS_TIMEOUT: Duration = Duration::from_millis(500);
-const REPEAT_TIMEOUT: Duration = Duration::from_millis(150);
+const FIRST_PRESS_TIMEOUT: Duration = Duration::from_millis(120);
+const REPEAT_TIMEOUT: Duration = Duration::from_millis(100);
+
+#[cfg(target_os = "windows")]
+fn is_key_physically_down(key: VirtualKey) -> Option<bool> {
+    unsafe extern "system" {
+        fn GetAsyncKeyState(vKey: i32) -> i16;
+    }
+    let vk = match key {
+        VirtualKey::W => b'W' as i32,
+        VirtualKey::A => b'A' as i32,
+        VirtualKey::S => b'S' as i32,
+        VirtualKey::D => b'D' as i32,
+        VirtualKey::E => b'E' as i32,
+        VirtualKey::B => b'B' as i32,
+        VirtualKey::M => b'M' as i32,
+        VirtualKey::K => b'K' as i32,
+        VirtualKey::Space => 0x20, // VK_SPACE
+        VirtualKey::Shift => 0x10, // VK_SHIFT
+        VirtualKey::Up => 0x26,    // VK_UP
+        VirtualKey::Down => 0x28,  // VK_DOWN
+        VirtualKey::Left => 0x25,  // VK_LEFT
+        VirtualKey::Right => 0x27, // VK_RIGHT
+        VirtualKey::Tab => 0x09,   // VK_TAB
+        VirtualKey::Escape => 0x1B,// VK_ESCAPE
+        VirtualKey::Enter => 0x0D, // VK_RETURN
+        _ => return None,
+    };
+    unsafe {
+        let state = GetAsyncKeyState(vk);
+        Some((state as u16 & 0x8000) != 0)
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn is_key_physically_down(_key: VirtualKey) -> Option<bool> {
+    None
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VirtualKey {
@@ -23,6 +59,7 @@ pub enum VirtualKey {
     K,
     Space,
     Shift,
+    Tab,
     Enter,
     Escape,
     F1,
@@ -30,6 +67,8 @@ pub enum VirtualKey {
     F3,
     F4,
     F5,
+    F6,
+    F7,
     F9,
     Char(char),
     Any,
@@ -85,6 +124,12 @@ impl InputState {
         }
     }
 
+    pub fn press_key_for_test(&mut self, key: VirtualKey) {
+        self.just_pressed.insert(key);
+        self.held_keys.insert(key, (Instant::now(), false));
+        self.any_key_just_pressed = true;
+    }
+
     /// Prepares state for a new frame, decaying transient press/release events
     /// and checking held key timeouts for terminals without release event reporting.
     pub fn begin_frame(&mut self, now: Instant) {
@@ -99,20 +144,23 @@ impl InputState {
         self.mouse_scroll_delta = 0;
         self.mouse_moved = false;
 
-        // Check fallback timeout for keys that might not receive release events.
-        // First press gets 500ms grace window, subsequent repeated keys get 150ms window.
-        let expired: Vec<VirtualKey> = self
-            .held_keys
-            .iter()
-            .filter_map(|(&key, &(time, is_repeat))| {
-                let timeout = if is_repeat { REPEAT_TIMEOUT } else { FIRST_PRESS_TIMEOUT };
-                if now.duration_since(time) > timeout {
-                    Some(key)
+        // Check fallback timeout or physical key state for keys that might not receive release events.
+        // On Windows, GetAsyncKeyState checks if the physical key has been released.
+        let mut expired = Vec::new();
+        for (&key, val) in self.held_keys.iter_mut() {
+            if let Some(is_down) = is_key_physically_down(key) {
+                if is_down {
+                    val.0 = now; // Actively held physically
                 } else {
-                    None
+                    expired.push(key); // Physical key released
                 }
-            })
-            .collect();
+            } else {
+                let timeout = if val.1 { REPEAT_TIMEOUT } else { FIRST_PRESS_TIMEOUT };
+                if now.duration_since(val.0) > timeout {
+                    expired.push(key);
+                }
+            }
+        }
 
         for key in expired {
             self.held_keys.remove(&key);
@@ -192,6 +240,11 @@ impl InputState {
     }
 
     #[inline]
+    pub fn mouse_world_at(&self, cam_x: f32, cam_y: f32) -> (f32, f32) {
+        (self.mouse_pos.0 + cam_x, self.mouse_pos.1 + cam_y)
+    }
+
+    #[inline]
     pub fn is_held(&self, key: VirtualKey) -> bool {
         self.held_keys.contains_key(&key)
     }
@@ -242,12 +295,15 @@ fn map_crossterm_key(event: &KeyEvent) -> Vec<VirtualKey> {
         KeyCode::Left => keys.push(VirtualKey::Left),
         KeyCode::Right => keys.push(VirtualKey::Right),
         KeyCode::Enter => keys.push(VirtualKey::Enter),
+        KeyCode::Tab => keys.push(VirtualKey::Tab),
         KeyCode::Esc => keys.push(VirtualKey::Escape),
         KeyCode::F(1) => keys.push(VirtualKey::F1),
         KeyCode::F(2) => keys.push(VirtualKey::F2),
         KeyCode::F(3) => keys.push(VirtualKey::F3),
         KeyCode::F(4) => keys.push(VirtualKey::F4),
         KeyCode::F(5) => keys.push(VirtualKey::F5),
+        KeyCode::F(6) => keys.push(VirtualKey::F6),
+        KeyCode::F(7) => keys.push(VirtualKey::F7),
         KeyCode::F(9) => keys.push(VirtualKey::F9),
         KeyCode::Char(' ') => keys.push(VirtualKey::Space),
         KeyCode::Char(c) => {

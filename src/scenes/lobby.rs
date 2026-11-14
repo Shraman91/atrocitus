@@ -127,7 +127,8 @@ impl Scene for LobbyScene {
     ) -> SceneTransition {
         self.time += dt;
         self.banner_timer += dt * 2.5;
-        self.last_mouse_world = input.mouse_world_pos;
+        let mouse_world = input.mouse_world_at(self.camera.x, self.camera.y);
+        self.last_mouse_world = mouse_world;
 
         // Keep player equipped class in sync with save.ron (e.g. after returning from ClassSelectScene)
         let save = SaveData::load();
@@ -230,7 +231,7 @@ impl Scene for LobbyScene {
         }
 
         // Normal Gameplay Updates
-        self.player.update(dt, input, &self.world, &mut self.particles);
+        self.player.update(dt, input, mouse_world, &self.world, &mut self.particles);
         self.map_grid.reveal(self.player.x, self.player.y, 45.0);
         self.bonfire.update(dt, self.player.x, self.player.y, input, &mut self.particles);
         self.firekeeper.update(dt);
@@ -238,8 +239,8 @@ impl Scene for LobbyScene {
         self.adventurer.update(dt);
         self.witch.update(dt);
 
-        let mx = input.mouse_world_pos.0;
-        let my = input.mouse_world_pos.1;
+        let mx = mouse_world.0;
+        let my = mouse_world.1;
         let pressed_talk = input.just_pressed(VirtualKey::E);
         let clicked = input.mouse_left_just_pressed;
 
@@ -274,8 +275,8 @@ impl Scene for LobbyScene {
         // Gate of Trials interaction check (North edge)
         let dist_to_gate = ((self.player.x - gate_pos.0).powi(2) + (self.player.y - gate_pos.1).powi(2)).sqrt();
         let clicked_gate = input.mouse_left_just_pressed
-            && (input.mouse_world_pos.0 - gate_pos.0).abs() < 18.0
-            && (input.mouse_world_pos.1 - gate_pos.1).abs() < 18.0;
+            && (mx - gate_pos.0).abs() < 18.0
+            && (my - gate_pos.1).abs() < 18.0;
 
         if (dist_to_gate < 26.0 && input.just_pressed(VirtualKey::E)) || (dist_to_gate < 34.0 && clicked_gate) {
             self.gate_dialogue_timer = 3.5;
@@ -356,7 +357,7 @@ impl Scene for LobbyScene {
         // 5. Render Particle System (Embers, Ash, Dust)
         self.particles.draw(fb, cam_x, cam_y);
 
-        // 6. Dynamic Lighting & Shadows Pass
+        // 6. Dynamic Lighting, Light Shafts & Shadows Pass
         let bonfire_light = self.bonfire.get_light();
         let firekeeper_light = self.firekeeper.get_light(self.time);
         let blacksmith_light = self.blacksmith.get_light(self.time);
@@ -378,14 +379,26 @@ impl Scene for LobbyScene {
         shadow_casters.push(self.adventurer.get_shadow_caster());
         shadow_casters.push(self.witch.get_shadow_caster());
 
+        let mut all_lights = Vec::with_capacity(6 + self.world.torch_lights.len());
+        all_lights.push(bonfire_light);
+        all_lights.push(firekeeper_light);
+        all_lights.push(blacksmith_light);
+        all_lights.push(adventurer_light);
+        all_lights.push(witch_light);
+        all_lights.push(player_aura);
+        all_lights.extend_from_slice(&self.world.torch_lights);
+
         self.lighting.render_shadows(fb, &bonfire_light, &shadow_casters, cam_x, cam_y);
         self.lighting.apply_lighting(
             fb,
-            &[bonfire_light, firekeeper_light, blacksmith_light, adventurer_light, witch_light, player_aura],
+            &all_lights,
             cam_x,
             cam_y,
             self.time,
         );
+
+        // 6b. Volumetric Light Shafts from Ruined Ceiling
+        self.world.draw_light_shafts(fb, cam_x, cam_y, self.time);
 
         // 7. Atmospheric Post-Processing
         PostProcessor::apply_drifting_fog(fb, self.time);
@@ -413,13 +426,13 @@ impl Scene for LobbyScene {
                 fb,
                 gate_scr_x,
                 gate_scr_y - 20,
-                "The Gate of Trials is sealed until combat begins...",
+                "The Gate of Trials leads to the Dilapidated Forest... The iron portcullis remains sealed until trials begin.",
                 Palette::TEXT_BRIGHT,
                 Palette::UI_PANEL_BG,
                 Palette::UI_BORDER,
             );
         } else if dist_to_gate < 28.0 {
-            let prompt = "[Click / E] EXAMINE GATE";
+            let prompt = "[Click / E] EXAMINE GATE OF TRIALS";
             let prompt_w = TextRenderer::measure_width(prompt, FontSize::Tiny3x5);
             let bx = gate_scr_x - prompt_w / 2;
             let by = gate_scr_y - 26;
@@ -457,7 +470,7 @@ impl Scene for LobbyScene {
         if self.show_controls || self.controls_hint_timer > 0.0 {
             let base_r = ui.rows.saturating_sub(4);
             let hint_bg = Some(Color::rgb(14, 16, 22));
-            ui.print(2, base_r, "[WASD] Move  [Mouse] Aim  [Space/RMB] Roll  [E] Interact", Palette::TEXT_GOLD, hint_bg);
+            ui.print(2, base_r, "[WASD] Move  [Mouse] Aim  [Space] Roll  [E] Interact", Palette::TEXT_GOLD, hint_bg);
             ui.print(2, base_r + 1, "[M] Map  [B] Backpack  [K] Spells  [F2] Layouts  [F4] Gallery", Palette::TEXT_NORMAL, hint_bg);
             ui.print(2, base_r + 2, "[F1] Toggle Hints  [F3] Debug  [Esc] Pause", Palette::TEXT_MUTED, hint_bg);
         }

@@ -193,6 +193,22 @@ impl UiCanvas {
         }
     }
 
+    /// Clears a rectangular region of UI cells back to None,
+    /// allowing half-block Framebuffer graphics to show through.
+    pub fn clear_rect(&mut self, rect: Rect) {
+        let r_top = rect.y.max(0);
+        let r_bottom = rect.bottom().min(self.rows as i32);
+        let r_left = rect.x.max(0);
+        let r_right = rect.right().min(self.cols as i32);
+
+        for r in r_top..r_bottom {
+            let row_offset = r as usize * self.cols;
+            for c in r_left..r_right {
+                self.cells[row_offset + c as usize] = None;
+            }
+        }
+    }
+
     /// Draws a styled panel using box-drawing characters and an optional title.
     pub fn draw_panel(&mut self, rect: impl std::borrow::Borrow<Rect>, title: &str, style: PanelStyle) {
         let rect = rect.borrow();

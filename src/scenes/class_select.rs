@@ -189,9 +189,22 @@ impl Scene for ClassSelectScene {
             };
             ui.draw_panel(card_rect, &class_def.name, panel_style);
 
+            // Punch out interior of the card on UI canvas so framebuffer half-block sprites show through
+            let card_interior = Rect::new(cx as i32 + 1, start_row as i32 + 1, card_w as i32 - 2, card_h as i32 - 3);
+            ui.clear_rect(card_interior);
+            fb.draw_rect(
+                card_interior.x,
+                card_interior.y * 2,
+                card_interior.w,
+                card_interior.h * 2,
+                Color::rgb(14, 16, 22),
+                true,
+            );
+
             // Rotating Character Preview in framebuffer
-            let body_sprite = &bank.body_idle[preview_dir_idx];
-            let char_pixel_x = (cx as i32) + (card_w as i32 - 16) / 2;
+            let idle_frame = ((self.time * 2.5) as usize) % 4;
+            let body_sprite = &bank.body_idle[preview_dir_idx][idle_frame];
+            let char_pixel_x = (cx as i32) + (card_w as i32 - 18) / 2;
             let char_pixel_y = ((start_row + 2) * 2) as i32;
 
             if let Some(gear_set) = bank.get_class_gear(class_def.kind()) {

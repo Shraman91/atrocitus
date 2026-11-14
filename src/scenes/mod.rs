@@ -267,4 +267,137 @@ mod tests {
             spellbook.render(&mut fb, &mut ui, &bank);
         }
     }
+
+    #[test]
+    fn test_phase2_sprite_quality_and_gallery_coverage() {
+        let bank = SpriteBank::build();
+
+        // 1. Verify Player / Wanderer dimensions
+        for d in 0..4 {
+            for f in 0..4 {
+                assert_eq!(bank.body_idle[d][f].width, 18);
+                assert_eq!(bank.body_idle[d][f].height, 30);
+            }
+            for f in 0..6 {
+                assert_eq!(bank.body_walk[d][f].width, 18);
+                assert_eq!(bank.body_walk[d][f].height, 30);
+            }
+            for f in 0..7 {
+                assert_eq!(bank.body_roll[d][f].width, 18);
+                assert_eq!(bank.body_roll[d][f].height, 30);
+            }
+            for f in 0..4 {
+                assert_eq!(bank.body_lmb[d][f].width, 18);
+                assert_eq!(bank.body_lmb[d][f].height, 30);
+                assert_eq!(bank.body_rmb[d][f].width, 18);
+                assert_eq!(bank.body_rmb[d][f].height, 30);
+            }
+            assert_eq!(bank.body_hit[d].width, 18);
+            assert_eq!(bank.body_hit[d].height, 30);
+        }
+        assert_eq!(bank.body_death.width, 18);
+        assert_eq!(bank.body_death.height, 30);
+
+        // 2. Verify NPC dimensions & 4-frame cycles
+        for f in 0..4 {
+            assert_eq!(bank.firekeeper_anim[f].width, 18);
+            assert_eq!(bank.firekeeper_anim[f].height, 30);
+            assert_eq!(bank.blacksmith_anim[f].width, 22);
+            assert_eq!(bank.blacksmith_anim[f].height, 34);
+            assert_eq!(bank.adventurer_anim[f].width, 18);
+            assert_eq!(bank.adventurer_anim[f].height, 30);
+            assert_eq!(bank.witch_anim[f].width, 18);
+            assert_eq!(bank.witch_anim[f].height, 30);
+        }
+
+        // 3. Verify Enemy dimensions
+        for f in 0..4 {
+            assert_eq!(bank.sludge_idle[f].width, 26);
+            assert_eq!(bank.sludge_idle[f].height, 20);
+            assert_eq!(bank.worm_anim[f].width, 14);
+            assert_eq!(bank.worm_anim[f].height, 10);
+            for d in 0..4 {
+                assert_eq!(bank.skeleton_idle[d][f].width, 18);
+                assert_eq!(bank.skeleton_idle[d][f].height, 30);
+            }
+        }
+        assert_eq!(bank.fly_anim[0].width, 12);
+        assert_eq!(bank.fly_anim[0].height, 12);
+        assert_eq!(bank.fly_shadow.width, 12);
+        assert_eq!(bank.fly_shadow.height, 4);
+
+        // 4. Verify Gallery render exhaustive matrix (14 entities x 7 states x 4 directions x 3 resolutions)
+        let resolutions = [(120, 40), (160, 50), (200, 60)];
+
+        for &(cols, rows) in &resolutions {
+            let mut fb = Framebuffer::new(cols, rows * 2);
+            let mut ui = UiCanvas::new(cols, rows);
+
+            for char_idx in 0..14 {
+                for state_idx in 0..7 {
+                    for dir_idx in 0..4 {
+                        let mut gallery = gallery::GalleryScene::new();
+                        gallery.on_resize(cols, rows * 2);
+
+                        // Set character, state, direction
+                        for _ in 0..char_idx {
+                            let mut d_input = crate::engine::input::InputState::new();
+                            d_input.press_key_for_test(crate::engine::input::VirtualKey::D);
+                            gallery.update(0.1, &d_input, &bank);
+                        }
+                        for _ in 0..dir_idx {
+                            let mut s_input = crate::engine::input::InputState::new();
+                            s_input.press_key_for_test(crate::engine::input::VirtualKey::S);
+                            gallery.update(0.1, &s_input, &bank);
+                        }
+                        let mut tab_input = crate::engine::input::InputState::new();
+                        let key_char = match state_idx {
+                            0 => '1',
+                            1 => '2',
+                            2 => '3',
+                            3 => '4',
+                            4 => '5',
+                            5 => '6',
+                            _ => '7',
+                        };
+                        tab_input.press_key_for_test(crate::engine::input::VirtualKey::Char(key_char));
+                        gallery.update(0.1, &tab_input, &bank);
+
+                        // Render
+                        gallery.render(&mut fb, &mut ui, &bank);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_gallery_and_class_select_sprites_not_obscured_by_ui() {
+        let bank = SpriteBank::build();
+        let mut fb = Framebuffer::new(120, 80);
+        let mut ui = UiCanvas::new(120, 40);
+
+        let gallery = gallery::GalleryScene::new();
+        gallery.render(&mut fb, &mut ui, &bank);
+
+        let pw = (120usize.saturating_sub(6)).min(112);
+        let ph = (40usize.saturating_sub(4)).min(36);
+        let px = (120 - pw) / 2;
+        let py = (40 - ph) / 2;
+        let stage_top = py + 5;
+        let stage_rect = crate::ui::layout::Rect::new(px as i32 + 2, stage_top as i32, pw as i32 - 4, (py + ph - 3 - stage_top) as i32);
+        let left_cx = stage_rect.x + (stage_rect.w / 4);
+        let right_cx = stage_rect.x + (stage_rect.w * 3 / 5);
+        let check_row = stage_top + 4;
+
+        // UI cell over 1x sprite MUST be None
+        assert_eq!(ui.get_cell(left_cx, check_row as i32), None, "1x sprite in gallery must not be obscured by UI cell");
+        // UI cell over magnified sprite MUST be None
+        assert_eq!(ui.get_cell(right_cx, check_row as i32), None, "Magnified sprite in gallery must not be obscured by UI cell");
+
+        // Verify ClassSelectScene also does not obscure rotating character preview
+        let class_select = class_select::ClassSelectScene::new();
+        class_select.render(&mut fb, &mut ui, &bank);
+        assert_eq!(ui.get_cell(8, 10), None, "Class preview in card must not be obscured by UI cell");
+    }
 }
