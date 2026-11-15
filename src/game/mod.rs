@@ -1,6 +1,8 @@
 pub mod bonfire;
 pub mod camera;
 pub mod classes;
+pub mod combat;
+pub mod enemy;
 pub mod equipment;
 pub mod inventory;
 pub mod map;

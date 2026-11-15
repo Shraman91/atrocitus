@@ -5,8 +5,8 @@ Tracking document for all phases of development. Updated after every phase to pr
 ---
 
 ## Overall Status
-- **Current Phase**: Phase 2 COMPLETED. Ready for Phase 3 (Core Combat + Resources Framework) upon user command.
-- **Engine Baseline**: Verified at 120x40, 160x50, 200x60; 60 FPS fixed timestep; dual-layer renderer; panic-safe terminal guard. All 13 unit/integration tests passing. Zero clippy warnings. Release binary compiled.
+- **Current Phase**: Phase 3 COMPLETED. Ready for Phase 4 (The Dilapidated Forest + Enemies) upon user command.
+- **Engine Baseline**: Verified at 120x40, 160x50, 200x60; 60 FPS fixed timestep; dual-layer renderer; panic-safe terminal guard. All 24 unit/integration tests passing. Zero clippy warnings. Release binary compiled.
 
 ---
 
@@ -74,34 +74,38 @@ Tracking document for all phases of development. Updated after every phase to pr
 ---
 
 ### Phase 3: Core Combat + Resources Framework
-- [ ] **Frame-Data Attack System**
-  - [ ] Startup, active, recovery frames, damage, knockback, hit-stop (2-4 frames), screen shake.
-  - [ ] Hitbox shapes (arc, cone, circle, projectile) with Height Bands (Low, Mid, High).
-  - [ ] Spatial hash for efficient collision queries (up to ~40 live entities).
-  - [ ] Roll i-frames and post-damage invulnerability frames.
-- [ ] **2.5D Height System**
-  - [ ] Ground position $(x, y)$ and height $z$. Flying enemies at High band with ground shadow.
-- [ ] **Player Combat HUD**
-  - [ ] 5 Hearts with half-heart granularity.
-  - [ ] Souls counter (defaults to 100).
-  - [ ] Mage-only mana bar.
-  - [ ] Status effect icons (Poison, Acid).
-  - [ ] Class ability icons with cooldown rings and "↑" High-band indicators.
-- [ ] **Souls & Death Loop**
-  - [ ] Enemies drop souls; player drops soul bloodstain on death.
-  - [ ] "YOU DIED" banner, respawn at last bonfire, retrieve or lose souls.
-- [ ] **Corpse Consumption & Status Effects**
-  - [ ] Poison DoT and Acid puddle hazard zones.
-  - [ ] Mage corpse consumption (hold `E` for 0.8s) to restore mana with particle stream.
-- [ ] **5 Class Move Implementations**
-  - [ ] Knight: 3-hit combo (Low, Low, High rising slash) + frontal shield block.
-  - [ ] Mage: Ember Bolt (fast projectile) + Cinder Nova (charged AoE all bands).
-  - [ ] Assassin: 3-hit combo (Low, Low, High uppercut) + Shadowstep blink (3x backstab).
-  - [ ] Hunter: Pistol-sword flintlock (ranged High) + blade slash combo.
-  - [ ] Alchemist: Arced vial throw (acid/fire DoT) + Eye Rite slowing arcane zone.
-- [ ] **Combat Debug Tools**
-  - [ ] `F6`: Toggle hitboxes, hurtboxes, and height band overlays.
-  - [ ] `F7`: Enemy spawner at mouse cursor.
+- [x] **Frame-Data Attack System**
+  - [x] Startup, active, recovery frames, damage, knockback, hit-stop (2-4 frames), trauma-based screen shake.
+  - [x] Hitbox shapes (Arc cleave, Circle AoE, AABB, Projectile) with Height Bands (Low, Mid, High, All).
+  - [x] Spatial hash grid (32px cells) for zero-allocation broadphase collision queries.
+  - [x] Roll invulnerability frames (frames 2 through 14 of 23-frame roll) and post-damage i-frames with sprite blink.
+- [x] **2.5D Height System**
+  - [x] Ground position $(x, y)$ and height $z$. Flying enemies (Carrion Fly) at High band with ground shadow.
+  - [x] Strict height-band collision checks: Low-only attacks cannot hit High flying enemies; High attacks hit Mid/High; All hits all.
+- [x] **Player Combat HUD & Resources**
+  - [x] 5 Hearts with half-heart granularity (10 HP total) in UI layer with damage white-flash.
+  - [x] Souls counter (`✦ 100 SOULS`).
+  - [x] Mage-only mana bar (`MANA [████████░░░░] 60/100`) with regen.
+  - [x] Status effect indicators: Poison DoT (`[☣ POISON 4.2s]`), Acid burn (`[⚡ ACID 2.8s]`).
+  - [x] Class ability HUD with move descriptions and `[↑High]` height band tags.
+- [x] **Souls & Death Loop**
+  - [x] "YOU DIED" death screen and bloodstain dropping at player death location.
+  - [x] Bonfire respawn with full HP and cleared status effects; retrieving bloodstain restores souls with `+X SOULS RETRIEVED` banner.
+  - [x] Defeated enemies yield souls with floating "+X" text and leave persistent corpses.
+- [x] **Corpse Consumption & Hazard Zones**
+  - [x] Poison DoT and Acid puddle hazard zones dealing periodic tick damage.
+  - [x] Mage corpse consumption: holding `E` for 0.8s channels dark purple siphon stream, consumes corpse, and restores 40 mana.
+- [x] **5 Playable Class Move Sets**
+  - [x] Knight: 3-hit combo (Low, Mid, High rising slash) + frontal shield block (`RMB`, 80% damage reduction, staggered attacker).
+  - [x] Mage: Ember Bolt (`LMB`, Mid band, 5 mana) + Cinder Nova (`RMB`, radial explosion, All bands, 25 mana) + Corpse Siphon (`E`).
+  - [x] Assassin: Rapid 3-hit dagger flurry (`LMB`) + Shadowstep (`RMB`, 45px teleport-dash with 3x backstab crit window).
+  - [x] Hunter: Twin blade sweep (`LMB`, wide arc Mid band) + Flintlock Shot (`RMB`, silver bullet High band, hits flying enemies, recoil).
+  - [x] Alchemist: Acid Vial Throw (`LMB`, lobbed arc, creates Low acid puddle for 3.5s) + Eye Rite (`RMB`, slows enemies by 50% for 4s).
+- [x] **Combat Debug Tools**
+  - [x] `F6`: Toggle hitbox, hurtbox, and height-band visualization (green hurtbox, blue High, yellow Low, red active attacks).
+  - [x] `F7`: Enemy spawner at cursor position cycling Sludge -> Skeleton -> Fly -> Worm.
+- [x] **Data-Driven Configuration (`data/combat.ron`)**
+  - [x] All player HP, mana, regen, class move damages, reaches, cooldowns, and enemy stats externalized with Ron deserialization and code fallbacks.
 
 ---
 

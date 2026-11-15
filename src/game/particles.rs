@@ -8,6 +8,7 @@ pub enum ParticleType {
     Ember,
     Ash,
     Dust,
+    Spark,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -89,6 +90,20 @@ impl ParticleSystem {
         }
     }
 
+    pub fn spawn_spark(&mut self, x: f32, y: f32, vx: f32, vy: f32) {
+        if let Some(p) = self.pool.iter_mut().find(|p| !p.active) {
+            let mut rng = rand::rng();
+            p.x = x;
+            p.y = y;
+            p.vx = vx + rng.random_range(-12.0..12.0);
+            p.vy = vy + rng.random_range(-12.0..6.0);
+            p.life = rng.random_range(0.18..0.45);
+            p.max_life = p.life;
+            p.p_type = ParticleType::Spark;
+            p.active = true;
+        }
+    }
+
     pub fn spawn_burst(&mut self, cx: f32, cy: f32, count: usize) {
         let mut rng = rand::rng();
         for _ in 0..count {
@@ -123,6 +138,10 @@ impl ParticleSystem {
                 ParticleType::Dust => {
                     p.vx *= 0.85;
                     p.vy *= 0.85;
+                }
+                ParticleType::Spark => {
+                    p.vx *= 0.88;
+                    p.vy += 32.0 * dt;
                 }
             }
         }
@@ -159,6 +178,14 @@ impl ParticleSystem {
                     let alpha = ((1.0 - progress) * 80.0) as u8;
                     let col = Color::rgba(Palette::STONE_MID.r, Palette::STONE_MID.g, Palette::STONE_MID.b, alpha);
                     fb.set_pixel_blend(sx, sy, col);
+                }
+                ParticleType::Spark => {
+                    let col = if progress < 0.5 {
+                        Color::rgb(255, 240, 180)
+                    } else {
+                        Palette::BONFIRE_ORANGE
+                    };
+                    fb.set_pixel_add(sx, sy, col);
                 }
             }
         }

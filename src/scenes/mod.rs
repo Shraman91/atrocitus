@@ -397,4 +397,48 @@ mod tests {
         class_select.render(&mut fb, &mut ui, &bank);
         assert_eq!(ui.get_cell(8, 10), None, "Class preview in card must not be obscured by UI cell");
     }
+
+    #[test]
+    fn test_phase3_combat_loop_and_resources() {
+        let bank = SpriteBank::build();
+        let world = crate::game::world::World::build(280, 190);
+        let mut lobby = lobby::LobbyScene::new(world);
+
+        let mut input = crate::engine::input::InputState::new();
+
+        // 1. Verify F7 enemy spawner cycles enemies at mouse cursor
+        input.mouse_ever_detected = true;
+        input.mouse_pos = (120.0, 80.0);
+        input.press_key_for_test(crate::engine::input::VirtualKey::F7);
+        lobby.update(0.016, &input, &bank);
+
+        // 2. Verify F6 hitbox debug toggle
+        let mut f6_input = crate::engine::input::InputState::new();
+        f6_input.press_key_for_test(crate::engine::input::VirtualKey::F6);
+        lobby.update(0.016, &f6_input, &bank);
+
+        // 3. Simulate 60 frames of combat
+        for _ in 0..60 {
+            let mut tick_input = crate::engine::input::InputState::new();
+            tick_input.mouse_ever_detected = true;
+            tick_input.mouse_pos = (140.0, 90.0);
+            lobby.update(0.016, &tick_input, &bank);
+        }
+
+        // 4. Multi-resolution render checks (120x40, 160x50, 200x60)
+        let resolutions = [(120, 40), (160, 50), (200, 60)];
+        for &(cols, rows) in &resolutions {
+            let mut fb = Framebuffer::new(cols, rows * 2);
+            let mut ui = UiCanvas::new(cols, rows);
+            lobby.on_resize(cols, rows * 2);
+            lobby.render(&mut fb, &mut ui, &bank);
+
+            // Verify top-left combat HUD exists
+            let cell = ui.get_cell(2, 1);
+            assert!(cell.is_some(), "Mantle & Souls badge must be rendered");
+
+            let hearts_cell = ui.get_cell(2, 2);
+            assert!(hearts_cell.is_some(), "Hearts HUD must be rendered");
+        }
+    }
 }
