@@ -2,6 +2,7 @@ use super::adventurer_dialogue::AdventurerDialogueScene;
 use super::backpack::BackpackScene;
 use super::blacksmith::BlacksmithScene;
 use super::dialogue::DialogueScene;
+use super::forest::ForestScene;
 use super::gallery::GalleryScene;
 use super::map::MapScene;
 use super::spellbook::SpellbookScene;
@@ -29,7 +30,7 @@ use crate::game::map::MapGrid;
 use crate::game::npc::{Npc, NpcKind};
 use crate::game::particles::ParticleSystem;
 use crate::game::player::Player;
-use crate::game::world::World;
+use crate::game::world::{ForestPartId, World};
 use crate::ui::canvas::PanelStyle;
 use crate::ui::layout::Rect;
 use crate::ui::UiCanvas;
@@ -43,8 +44,8 @@ enum RenderableItem<'a> {
 }
 
 pub struct LobbyScene {
-    world: World,
-    player: Player,
+    pub world: World,
+    pub player: Player,
     camera: Camera,
     bonfire: Bonfire,
     firekeeper: Npc,
@@ -692,17 +693,18 @@ impl Scene for LobbyScene {
             return SceneTransition::Push(Box::new(WitchShopScene::new()));
         }
 
-        // Gate of Trials interaction
+        // Gate of Trials interaction (Transitions to Dilapidated Forest Area)
         let dist_to_gate = ((self.player.x - gate_pos.0).powi(2) + (self.player.y - gate_pos.1).powi(2)).sqrt();
         let clicked_gate = input.mouse_left_just_pressed
-            && (mx - gate_pos.0).abs() < 18.0
-            && (my - gate_pos.1).abs() < 18.0;
+            && (mx - gate_pos.0).abs() < 24.0
+            && (my - gate_pos.1).abs() < 24.0;
 
-        if (dist_to_gate < 26.0 && input.just_pressed(VirtualKey::E)) || (dist_to_gate < 34.0 && clicked_gate) {
-            self.gate_dialogue_timer = 3.5;
-        }
-        if self.gate_dialogue_timer > 0.0 {
-            self.gate_dialogue_timer -= dt;
+        if (dist_to_gate < 28.0 && input.just_pressed(VirtualKey::E)) || (dist_to_gate < 36.0 && clicked_gate) {
+            return SceneTransition::Switch(Box::new(ForestScene::new(
+                self.player.equipped_class,
+                ForestPartId::Chapel,
+                self.player.souls,
+            )));
         }
 
         // Ambient particles
@@ -929,24 +931,14 @@ impl Scene for LobbyScene {
         let gate_scr_x = (gate_pos.0 - cam_x as f32).round() as i32;
         let gate_scr_y = (gate_pos.1 - cam_y as f32).round() as i32;
 
-        if self.gate_dialogue_timer > 0.0 {
-            TextRenderer::draw_speech_bubble(
-                fb,
-                gate_scr_x,
-                gate_scr_y - 20,
-                "The Gate of Trials leads to the Dilapidated Forest... The iron portcullis remains sealed until trials begin.",
-                Palette::TEXT_BRIGHT,
-                Palette::UI_PANEL_BG,
-                Palette::UI_BORDER,
-            );
-        } else if dist_to_gate < 28.0 {
-            let prompt = "[Click / E] EXAMINE GATE OF TRIALS";
+        if dist_to_gate < 30.0 {
+            let prompt = "[Click / E] ENTER THE DILAPIDATED FOREST";
             let prompt_w = TextRenderer::measure_width(prompt, FontSize::Tiny3x5);
             let bx = gate_scr_x - prompt_w / 2;
             let by = gate_scr_y - 26;
             fb.draw_rect(bx - 2, by - 1, prompt_w + 4, 7, Palette::UI_PANEL_BG, true);
             fb.draw_rect(bx - 2, by - 1, prompt_w + 4, 7, Palette::UI_BORDER, false);
-            TextRenderer::draw_text(fb, bx, by, prompt, FontSize::Tiny3x5, Palette::TEXT_MUTED);
+            TextRenderer::draw_text(fb, bx, by, prompt, FontSize::Tiny3x5, Palette::TEXT_GOLD);
         }
 
         // -------------------------------------------------------------

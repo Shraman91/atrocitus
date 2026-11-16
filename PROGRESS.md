@@ -5,8 +5,8 @@ Tracking document for all phases of development. Updated after every phase to pr
 ---
 
 ## Overall Status
-- **Current Phase**: Phase 3 COMPLETED. Ready for Phase 4 (The Dilapidated Forest + Enemies) upon user command.
-- **Engine Baseline**: Verified at 120x40, 160x50, 200x60; 60 FPS fixed timestep; dual-layer renderer; panic-safe terminal guard. All 24 unit/integration tests passing. Zero clippy warnings. Release binary compiled.
+- **Current Phase**: Phase 4 COMPLETED (First Area: The Dilapidated Forest & The Dread Keep with 4 Parts connected by Shimmering Fog Walls). Ready for Phase 5 (Polish & Balance / Boss Encounter) upon user command.
+- **Engine Baseline**: Verified at 120x40, 160x50, 200x60; 60 FPS fixed timestep; dual-layer renderer; panic-safe terminal guard. All 25 unit/integration tests passing. Zero clippy warnings. Release binary compiled.
 
 ---
 
@@ -109,22 +109,48 @@ Tracking document for all phases of development. Updated after every phase to pr
 
 ---
 
-### Phase 4: The Dilapidated Forest (First Area) + Enemies
-- [ ] **Area Transition & Structure (`data/areas/forest.ron`)**
-  - [ ] Gate of Trials in Colosseum -> Loading screen -> Dilapidated Forest.
-  - [ ] Bonfire checkpoint at entrance, winding path with 5 encounter zones, clearing bonfire, boss fog gate.
-  - [ ] Map (`M`) new region reveal with fog-of-war.
-- [ ] **Forest Environment Art**
-  - [ ] Dead twisted trees, rotted logs, mossy walls, broken wagon, murky puddles, hanging roots.
-  - [ ] Glowing fungus / mushrooms as light sources, falling leaves, fireflies, green-teal ambient.
-- [ ] **4 AI Enemy Implementations (`data/enemies.ron`)**
-  - [ ] Sludge: Acid vomit cone (3 hearts) + acid puddle DoT.
-  - [ ] Skeleton: Kiting archer with telegraphed green glow shot + Poison effect.
-  - [ ] Fly: Erratic High-band flight; dive-bite; immune to Low/ground attacks.
-  - [ ] Worm: Swarming fast crawler (6-12 count flocking), bite damage with immunity window.
-- [ ] **Zone Encounters & Respawn Logic**
-  - [ ] Zone 1 (worms) -> Zone 2 (sludge) -> Zone 3 (skeletons) -> Zone 4 (flies) -> Zone 5 (clearing guard).
-  - [ ] Bonfire rest respawns all area mobs.
+### Phase 4: The Dilapidated Forest & The Dread Keep (First Area)
+- [x] **4-Part Gothic Area Architecture (`data/areas/forest.ron`)**
+  - [x] Externalized data configuration for all 4 parts, ambient lighting colors, dimensions, bonfires, player spawn coordinates, prop lists, and enemy spawn tables.
+  - [x] Serde loading with code fallback in `src/game/world.rs`.
+- [x] **Part 1: The Desecrated Chapel**
+  - [x] Gothic ruined chapel nave with cracked flagstones and crumbling arched walls.
+  - [x] Scattered rotting corpses (siphonable by Mage for +40 mana), ancient carved pews, gothic altar, grave stones, and broken chapel arch.
+  - [x] Mobs: Corpse Worms (burrowing vermin) and Carrion Flies (buzzing High-band swarmers).
+  - [x] South Gate returning to Ashen Colosseum hub; forward Fog Wall leading to Autumn Woods.
+  - [x] Checkpoint bonfire at the chapel threshold.
+- [x] **Part 2: The Autumnal Woods**
+  - [x] Transition zone into the woods with a lighter fall/autumn atmosphere (amber/rust ground foliage, golden birch trees).
+  - [x] Fallen logs, broken peasant carts, weathered split-rail wooden fences.
+  - [x] Fluttering autumn leaves ambient particle system (`spawn_leaf`).
+  - [x] Mobs: Acid Sludges (corrosive ooze blobs) and Bogged Skeletons (kiting archers drawing poisoned arrows).
+  - [x] Shimmering Fog Walls connecting back to Chapel and forward into Deep Forest.
+- [x] **Part 3: The Gloomwood Deep**
+  - [x] Dense, thick, oppressive forest with dark teal peat bogs and twisted canopy.
+  - [x] Massive gnarled trees, tangled root briars, rotten hollow stumps.
+  - [x] Animated bioluminescent glowing mushrooms (teal/cyan caps) as natural light sources.
+  - [x] Drifting glowing spore particles (`spawn_spore`).
+  - [x] All 4 mobs active in dense ambush encounters (Worms, Flies, Sludges, Skeletons).
+  - [x] Shimmering Fog Walls connecting back to Autumn Woods and forward into Castle Keep.
+- [x] **Part 4: The Dread Keep (Castle Boss Area)**
+  - [x] Imposing gothic castle courtyard with obsidian flagstone flooring and towering battlements.
+  - [x] Massive gothic castle pillars, grotesque gargoyle statues, animated iron braziers with violet-amber fire, and tattered wall banners.
+  - [x] **Big elevated circular stage at the center** with concentric stone steps and heraldic runes, ready for boss encounters.
+  - [x] Elite castle guard sentinels stationed on and around the perimeter of the stage.
+  - [x] Return Fog Wall back into Deep Forest.
+- [x] **Dark Souls-Style Shimmering Fog Walls**
+  - [x] Rendered with undulating mist currents and soft golden-teal ethereal luminescence.
+  - [x] Proximity detection and mouse hover interaction: `[Click / E] Traverse Fog Wall to <Destination>`.
+  - [x] Smooth traversal transitions between connected parts with positioning at designated spawn points.
+- [x] **Full Combat & Resource Integration**
+  - [x] Bonfire checkpoint rest restores HP/mana and respawns area mobs.
+  - [x] All class movesets (Knight 3-hit combo & block, Mage Bolt/Nova/Corpse siphon, Assassin flurry/shadowstep, Hunter twin blade/flintlock, Alchemist vial/eye) fully functional and dealing damage against all mobs.
+  - [x] Souls accumulation and bloodstain dropping/retrieval on death.
+  - [x] Map (`M`) tracking world coordinates across all 4 parts.
+- [x] **Verification & Tests**
+  - [x] Dedicated unit/integration test `test_area1_forest_four_parts_and_fog_walls` verifying all 4 parts, props, enemy tables, terrain generation, and multi-resolution rendering.
+  - [x] All 25 tests pass. Zero clippy warnings (`cargo clippy --all-targets -- -D warnings`).
+  - [x] Release build compiled successfully (`cargo build --release`).
 
 ---
 

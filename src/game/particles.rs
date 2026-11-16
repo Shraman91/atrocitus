@@ -9,6 +9,8 @@ pub enum ParticleType {
     Ash,
     Dust,
     Spark,
+    AutumnLeaf,
+    Spore,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -104,6 +106,34 @@ impl ParticleSystem {
         }
     }
 
+    pub fn spawn_leaf(&mut self, x: f32, y: f32) {
+        if let Some(p) = self.pool.iter_mut().find(|p| !p.active) {
+            let mut rng = rand::rng();
+            p.x = x;
+            p.y = y;
+            p.vx = rng.random_range(4.0..14.0);
+            p.vy = rng.random_range(8.0..18.0);
+            p.life = rng.random_range(2.5..5.5);
+            p.max_life = p.life;
+            p.p_type = ParticleType::AutumnLeaf;
+            p.active = true;
+        }
+    }
+
+    pub fn spawn_spore(&mut self, x: f32, y: f32) {
+        if let Some(p) = self.pool.iter_mut().find(|p| !p.active) {
+            let mut rng = rand::rng();
+            p.x = x;
+            p.y = y;
+            p.vx = rng.random_range(-2.0..2.0);
+            p.vy = rng.random_range(-6.0..-1.5);
+            p.life = rng.random_range(2.0..4.5);
+            p.max_life = p.life;
+            p.p_type = ParticleType::Spore;
+            p.active = true;
+        }
+    }
+
     pub fn spawn_burst(&mut self, cx: f32, cy: f32, count: usize) {
         let mut rng = rand::rng();
         for _ in 0..count {
@@ -142,6 +172,12 @@ impl ParticleSystem {
                 ParticleType::Spark => {
                     p.vx *= 0.88;
                     p.vy += 32.0 * dt;
+                }
+                ParticleType::AutumnLeaf => {
+                    p.vx = ((p.y * 0.15).sin() * 8.0) + 6.0;
+                }
+                ParticleType::Spore => {
+                    p.vx += ((p.y * 0.1).cos() * 2.0) * dt;
                 }
             }
         }
@@ -185,6 +221,21 @@ impl ParticleSystem {
                     } else {
                         Palette::BONFIRE_ORANGE
                     };
+                    fb.set_pixel_add(sx, sy, col);
+                }
+                ParticleType::AutumnLeaf => {
+                    let col = if progress < 0.4 {
+                        Color::rgb(225, 140, 40)
+                    } else if progress < 0.8 {
+                        Color::rgb(180, 75, 25)
+                    } else {
+                        Color::rgb(120, 45, 18)
+                    };
+                    fb.set_pixel_blend(sx, sy, col);
+                }
+                ParticleType::Spore => {
+                    let alpha = ((1.0 - progress) * 160.0) as u8;
+                    let col = Color::rgba(65, 230, 175, alpha);
                     fb.set_pixel_add(sx, sy, col);
                 }
             }

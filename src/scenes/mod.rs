@@ -13,6 +13,7 @@ pub mod dialogue;
 pub mod gallery;
 pub mod loading;
 pub mod lobby;
+pub mod forest;
 pub mod map;
 pub mod spellbook;
 pub mod title;
@@ -265,6 +266,11 @@ mod tests {
             let mut spellbook = spellbook::SpellbookScene::new();
             spellbook.on_resize(cols, rows * 2);
             spellbook.render(&mut fb, &mut ui, &bank);
+
+            // 13. ForestScene (Area 1)
+            let mut forest = forest::ForestScene::new(Some(crate::game::classes::ClassKind::Knight), crate::game::world::ForestPartId::Chapel, 0);
+            forest.on_resize(cols, rows * 2);
+            forest.render(&mut fb, &mut ui, &bank);
         }
     }
 
@@ -439,6 +445,95 @@ mod tests {
 
             let hearts_cell = ui.get_cell(2, 2);
             assert!(hearts_cell.is_some(), "Hearts HUD must be rendered");
+        }
+    }
+
+    #[test]
+    fn test_area1_forest_four_parts_and_fog_walls() {
+        use crate::game::classes::ClassKind;
+        use crate::game::enemy::EnemyKind;
+        use crate::game::world::{ForestAreaConfig, ForestPartId, World};
+
+        // 1. Load data/areas/forest.ron
+        let config = ForestAreaConfig::load();
+        assert_eq!(config.parts.len(), 4, "Must contain all 4 parts of Area 1");
+
+        // Verify part 1: Chapel
+        let chapel = config.get_part(ForestPartId::Chapel).expect("Chapel part missing");
+        assert_eq!(chapel.name, "The Desecrated Chapel");
+        assert!(chapel.colosseum_gate.is_some(), "Chapel must have south gate to return to Colosseum");
+        assert!(chapel.fog_wall.is_some(), "Chapel must have forward fog wall to Autumn Woods");
+        let chapel_fog = chapel.fog_wall.as_ref().unwrap();
+        assert_eq!(chapel_fog.target_part, ForestPartId::AutumnWoods);
+        assert!(chapel.enemy_spawns.iter().any(|e| matches!(e.kind, EnemyKind::Worm)), "Chapel must have Corpse Worms");
+        assert!(chapel.enemy_spawns.iter().any(|e| matches!(e.kind, EnemyKind::Fly)), "Chapel must have Carrion Flies");
+
+        // Verify part 2: Autumn Woods
+        let woods = config.get_part(ForestPartId::AutumnWoods).expect("Autumn Woods part missing");
+        assert_eq!(woods.name, "The Autumnal Woods");
+        assert!(woods.return_fog_wall.is_some(), "Autumn Woods must have return fog wall to Chapel");
+        assert!(woods.fog_wall.is_some(), "Autumn Woods must have forward fog wall to Deep Forest");
+        let woods_fog = woods.fog_wall.as_ref().unwrap();
+        assert_eq!(woods_fog.target_part, ForestPartId::DeepForest);
+        assert!(woods.enemy_spawns.iter().any(|e| matches!(e.kind, EnemyKind::Sludge)), "Autumn Woods must have Acid Sludges");
+        assert!(woods.enemy_spawns.iter().any(|e| matches!(e.kind, EnemyKind::Skeleton)), "Autumn Woods must have Bogged Skeletons");
+
+        // Verify part 3: Gloomwood Deep
+        let deep = config.get_part(ForestPartId::DeepForest).expect("Deep Forest part missing");
+        assert_eq!(deep.name, "The Gloomwood Deep");
+        assert!(deep.return_fog_wall.is_some(), "Deep Forest must have return fog wall to Autumn Woods");
+        assert!(deep.fog_wall.is_some(), "Deep Forest must have forward fog wall to Castle Keep");
+        let deep_fog = deep.fog_wall.as_ref().unwrap();
+        assert_eq!(deep_fog.target_part, ForestPartId::CastleKeep);
+        assert!(deep.enemy_spawns.iter().any(|e| matches!(e.kind, EnemyKind::Worm)));
+        assert!(deep.enemy_spawns.iter().any(|e| matches!(e.kind, EnemyKind::Fly)));
+        assert!(deep.enemy_spawns.iter().any(|e| matches!(e.kind, EnemyKind::Sludge)));
+        assert!(deep.enemy_spawns.iter().any(|e| matches!(e.kind, EnemyKind::Skeleton)));
+
+        // Verify part 4: Dread Keep (Boss Area)
+        let castle = config.get_part(ForestPartId::CastleKeep).expect("Castle Keep part missing");
+        assert_eq!(castle.name, "The Dread Keep");
+        assert!(castle.return_fog_wall.is_some(), "Castle Keep must have return fog wall to Deep Forest");
+
+        // 2. Build world terrain for all 4 parts
+        for part in &config.parts {
+            let world = World::build_forest_part(part);
+            assert_eq!(world.width, part.width);
+            assert_eq!(world.height, part.height);
+            assert!(!world.colliders.is_empty(), "World must have collision boundaries");
+            assert!(!world.props.is_empty(), "World must have atmospheric props");
+        }
+
+        // 3. Test ForestScene progression and rendering at 120x40, 160x50, 200x60
+        let bank = SpriteBank::build();
+        let mut forest_scene = forest::ForestScene::new(Some(ClassKind::Knight), ForestPartId::Chapel, 150);
+
+        let resolutions = [(120, 40), (160, 50), (200, 60)];
+        let part_ids = [
+            ForestPartId::Chapel,
+            ForestPartId::AutumnWoods,
+            ForestPartId::DeepForest,
+            ForestPartId::CastleKeep,
+        ];
+
+        for &part_id in &part_ids {
+            let spawn = config.get_part(part_id).unwrap().player_spawn;
+            forest_scene.switch_to_part(part_id, spawn);
+
+            // Update scene for a few frames
+            let input = crate::engine::input::InputState::new();
+            forest_scene.update(0.016, &input, &bank);
+
+            for &(cols, rows) in &resolutions {
+                let mut fb = Framebuffer::new(cols, rows * 2);
+                let mut ui = UiCanvas::new(cols, rows);
+                forest_scene.on_resize(cols, rows * 2);
+                forest_scene.render(&mut fb, &mut ui, &bank);
+
+                // HUD check
+                let badge = ui.get_cell(2, 1);
+                assert!(badge.is_some(), "Mantle & souls HUD badge must be present in {:?}", part_id);
+            }
         }
     }
 }

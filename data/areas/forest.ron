@@ -1,0 +1,361 @@
+ForestAreaConfig(
+    title: "The Dilapidated Forest & The Dread Keep",
+    parts: [
+        // =========================================================================
+        // PART 1: THE DESECRATED CHAPEL
+        // =========================================================================
+        // Revolves around a ruined gothic chapel with corpses all around.
+        // Main mobs: Maggot worms and carrion flies swarming over the desecrated dead.
+        (
+            id: Chapel,
+            name: "The Desecrated Chapel",
+            subtitle: "Resting place of forgotten saints, now swarming with carrion and rot",
+            width: 240,
+            height: 180,
+            ambient_color: (32, 34, 46), // Cold slate moonlight floor
+            bonfire: Some((
+                x: 120.0,
+                y: 142.0,
+                name: "Chapel Courtyard Bonfire",
+            )),
+            player_spawn: (120.0, 130.0),
+            colosseum_gate: Some((120.0, 168.0)),
+            fog_wall: Some((
+                x: 120.0,
+                y: 24.0,
+                width: 34.0,
+                target_part: AutumnWoods,
+                target_spawn: (130.0, 158.0),
+                prompt: "Traverse Fog Wall to The Autumnal Woods",
+            )),
+            return_fog_wall: None,
+            stage_center: None,
+            stage_radius: None,
+            torches: [
+                (x: 80.0, y: 52.0, radius: 44.0, intensity: 0.85, color: (255, 150, 40), flicker: 0.08),
+                (x: 160.0, y: 52.0, radius: 44.0, intensity: 0.85, color: (255, 150, 40), flicker: 0.08),
+                (x: 52.0, y: 92.0, radius: 38.0, intensity: 0.75, color: (255, 140, 35), flicker: 0.07),
+                (x: 188.0, y: 92.0, radius: 38.0, intensity: 0.75, color: (255, 140, 35), flicker: 0.07),
+            ],
+            props: [
+                // Gothic Altar at the head of the ruined nave
+                (x: 105, y: 46, prop_type: ChapelAltar),
+
+                // Desecrated Wooden/Stone Pews flanking aisle
+                (x: 82, y: 68, prop_type: ChapelPew),
+                (x: 134, y: 68, prop_type: ChapelPew),
+                (x: 82, y: 92, prop_type: ChapelPew),
+                (x: 134, y: 92, prop_type: ChapelPew),
+
+                // Rotting Corpses scattered across courtyard and nave (Mage can siphon!)
+                (x: 68, y: 108, prop_type: RottingCorpse),
+                (x: 100, y: 78, prop_type: RottingCorpse),
+                (x: 142, y: 82, prop_type: RottingCorpse),
+                (x: 168, y: 112, prop_type: RottingCorpse),
+                (x: 88, y: 132, prop_type: RottingCorpse),
+                (x: 152, y: 136, prop_type: RottingCorpse),
+
+                // Gravestones & Tombstones in overgrown churchyard
+                (x: 48, y: 72, prop_type: GraveStone),
+                (x: 56, y: 126, prop_type: GraveStone),
+                (x: 178, y: 72, prop_type: GraveStone),
+                (x: 186, y: 126, prop_type: GraveStone),
+
+                // Ruined Chapel Arches & Buttresses
+                (x: 36, y: 44, prop_type: ChapelArch),
+                (x: 172, y: 44, prop_type: ChapelArch),
+                (x: 36, y: 104, prop_type: ChapelArch),
+                (x: 172, y: 104, prop_type: ChapelArch),
+
+                // Hanging Gibbet Cages with bones
+                (x: 74, y: 40, prop_type: HangingCage),
+                (x: 154, y: 40, prop_type: HangingCage),
+
+                // Wall Torches
+                (x: 80, y: 46, prop_type: WallTorch),
+                (x: 160, y: 46, prop_type: WallTorch),
+                (x: 52, y: 86, prop_type: WallTorch),
+                (x: 188, y: 86, prop_type: WallTorch),
+
+                // Bone Piles
+                (x: 72, y: 114, prop_type: BonePile),
+                (x: 162, y: 118, prop_type: BonePile),
+            ],
+            enemy_spawns: [
+                // Maggot Worms writhing near corpses
+                (kind: Worm, x: 74.0, y: 110.0),
+                (kind: Worm, x: 104.0, y: 80.0),
+                (kind: Worm, x: 146.0, y: 84.0),
+                (kind: Worm, x: 172.0, y: 114.0),
+                (kind: Worm, x: 92.0, y: 134.0),
+
+                // Carrion Flies circling in aerial band over the dead
+                (kind: Fly, x: 90.0, y: 76.0),
+                (kind: Fly, x: 148.0, y: 76.0),
+                (kind: Fly, x: 72.0, y: 106.0),
+                (kind: Fly, x: 166.0, y: 110.0),
+            ],
+        ),
+
+        // =========================================================================
+        // PART 2: THE AUTUMNAL WOODS
+        // =========================================================================
+        // The beginning of the woods, less dense following a fall/autumn atmosphere.
+        // Main enemies: Blobs (Acid Sludges) and Skeletons (Bogged Archers).
+        (
+            id: AutumnWoods,
+            name: "The Autumnal Woods",
+            subtitle: "Golden rust canopies, crumbling sepulchres, and restless bones",
+            width: 260,
+            height: 190,
+            ambient_color: (48, 38, 28), // Warm earthy autumn twilight
+            bonfire: Some((
+                x: 130.0,
+                y: 152.0,
+                name: "Autumn Verge Bonfire",
+            )),
+            player_spawn: (130.0, 142.0),
+            colosseum_gate: None,
+            fog_wall: Some((
+                x: 130.0,
+                y: 22.0,
+                width: 34.0,
+                target_part: DeepForest,
+                target_spawn: (140.0, 168.0),
+                prompt: "Traverse Fog Wall to The Gloomwood Deep",
+            )),
+            return_fog_wall: Some((
+                x: 130.0,
+                y: 176.0,
+                width: 34.0,
+                target_part: Chapel,
+                target_spawn: (120.0, 38.0),
+                prompt: "Traverse Fog Wall to The Desecrated Chapel",
+            )),
+            stage_center: None,
+            stage_radius: None,
+            torches: [
+                (x: 105.0, y: 120.0, radius: 46.0, intensity: 0.82, color: (255, 160, 45), flicker: 0.08),
+                (x: 155.0, y: 120.0, radius: 46.0, intensity: 0.82, color: (255, 160, 45), flicker: 0.08),
+                (x: 80.0, y: 70.0, radius: 42.0, intensity: 0.78, color: (255, 150, 40), flicker: 0.07),
+                (x: 180.0, y: 70.0, radius: 42.0, intensity: 0.78, color: (255, 150, 40), flicker: 0.07),
+            ],
+            props: [
+                // Autumn Birch / Oak Trees (sparse perimeter and glades)
+                (x: 62, y: 48, prop_type: AutumnTree),
+                (x: 192, y: 48, prop_type: AutumnTree),
+                (x: 48, y: 108, prop_type: AutumnTree),
+                (x: 206, y: 108, prop_type: AutumnTree),
+                (x: 88, y: 34, prop_type: AutumnTree),
+                (x: 168, y: 34, prop_type: AutumnTree),
+                (x: 98, y: 124, prop_type: AutumnTree),
+                (x: 158, y: 124, prop_type: AutumnTree),
+
+                // Decayed Fallen Logs
+                (x: 76, y: 88, prop_type: FallenLog),
+                (x: 172, y: 96, prop_type: FallenLog),
+
+                // Broken Merchant Carts with shattered wheels
+                (x: 72, y: 136, prop_type: BrokenCart),
+                (x: 182, y: 76, prop_type: BrokenCart),
+
+                // Weathered Wooden Fences
+                (x: 96, y: 154, prop_type: WoodenFence),
+                (x: 152, y: 154, prop_type: WoodenFence),
+                (x: 56, y: 80, prop_type: WoodenFence),
+
+                // Wall Sconces on stone boundary posts
+                (x: 105, y: 114, prop_type: WallTorch),
+                (x: 155, y: 114, prop_type: WallTorch),
+            ],
+            enemy_spawns: [
+                // Blobs (Acid Sludges) lurking in hollows
+                (kind: Sludge, x: 80.0, y: 92.0),
+                (kind: Sludge, x: 176.0, y: 100.0),
+                (kind: Sludge, x: 110.0, y: 64.0),
+                (kind: Sludge, x: 150.0, y: 64.0),
+
+                // Skeletons (Bogged Archers) kiting behind sparse autumn trees
+                (kind: Skeleton, x: 70.0, y: 55.0),
+                (kind: Skeleton, x: 188.0, y: 55.0),
+                (kind: Skeleton, x: 130.0, y: 45.0),
+            ],
+        ),
+
+        // =========================================================================
+        // PART 3: THE GLOOMWOOD DEEP
+        // =========================================================================
+        // Dense, thick, oppressive forest with all the mobs (Worms, Flies, Blobs, Skeletons).
+        (
+            id: DeepForest,
+            name: "The Gloomwood Deep",
+            subtitle: "Suffocating mire, twisted roots, and foul predators in the dark",
+            width: 280,
+            height: 200,
+            ambient_color: (18, 28, 26), // Dark gloom teal-black
+            bonfire: Some((
+                x: 140.0,
+                y: 162.0,
+                name: "Gloomwood Hollow Bonfire",
+            )),
+            player_spawn: (140.0, 150.0),
+            colosseum_gate: None,
+            fog_wall: Some((
+                x: 140.0,
+                y: 24.0,
+                width: 36.0,
+                target_part: CastleKeep,
+                target_spawn: (130.0, 148.0),
+                prompt: "Traverse Fog Wall to The Dread Keep",
+            )),
+            return_fog_wall: Some((
+                x: 140.0,
+                y: 186.0,
+                width: 36.0,
+                target_part: AutumnWoods,
+                target_spawn: (130.0, 36.0),
+                prompt: "Traverse Fog Wall to The Autumnal Woods",
+            )),
+            stage_center: None,
+            stage_radius: None,
+            torches: [
+                // Fungal bioluminescent point lights
+                (x: 82.0, y: 60.0, radius: 48.0, intensity: 0.90, color: (65, 230, 175), flicker: 0.05),
+                (x: 198.0, y: 60.0, radius: 48.0, intensity: 0.90, color: (65, 230, 175), flicker: 0.05),
+                (x: 62.0, y: 130.0, radius: 44.0, intensity: 0.85, color: (40, 180, 240), flicker: 0.06),
+                (x: 218.0, y: 130.0, radius: 44.0, intensity: 0.85, color: (40, 180, 240), flicker: 0.06),
+                (x: 140.0, y: 110.0, radius: 42.0, intensity: 0.80, color: (80, 240, 160), flicker: 0.05),
+            ],
+            props: [
+                // Massive Gnarled Ancient Trees
+                (x: 56, y: 42, prop_type: GnarledTree),
+                (x: 218, y: 42, prop_type: GnarledTree),
+                (x: 42, y: 104, prop_type: GnarledTree),
+                (x: 232, y: 104, prop_type: GnarledTree),
+                (x: 68, y: 158, prop_type: GnarledTree),
+                (x: 206, y: 158, prop_type: GnarledTree),
+                (x: 106, y: 78, prop_type: GnarledTree),
+                (x: 168, y: 78, prop_type: GnarledTree),
+
+                // Giant Bioluminescent Glowing Mushroom Clusters (light emitters!)
+                (x: 80, y: 56, prop_type: GlowingMushrooms),
+                (x: 196, y: 56, prop_type: GlowingMushrooms),
+                (x: 60, y: 126, prop_type: GlowingMushrooms),
+                (x: 216, y: 126, prop_type: GlowingMushrooms),
+                (x: 138, y: 106, prop_type: GlowingMushrooms),
+
+                // Tangled Root Briars & Thickets
+                (x: 102, y: 48, prop_type: RootBriar),
+                (x: 172, y: 48, prop_type: RootBriar),
+                (x: 82, y: 106, prop_type: RootBriar),
+                (x: 192, y: 106, prop_type: RootBriar),
+
+                // Rotten Stumps
+                (x: 116, y: 136, prop_type: RottenStump),
+                (x: 158, y: 136, prop_type: RottenStump),
+            ],
+            enemy_spawns: [
+                // ALL MOBS UNITED IN THE DENSE FOREST:
+                // 1. Corpse Worms
+                (kind: Worm, x: 92.0, y: 112.0),
+                (kind: Worm, x: 182.0, y: 112.0),
+                (kind: Worm, x: 138.0, y: 132.0),
+
+                // 2. Carrion Flies
+                (kind: Fly, x: 86.0, y: 64.0),
+                (kind: Fly, x: 192.0, y: 64.0),
+                (kind: Fly, x: 140.0, y: 92.0),
+
+                // 3. Blobs (Acid Sludges)
+                (kind: Sludge, x: 74.0, y: 138.0),
+                (kind: Sludge, x: 204.0, y: 138.0),
+                (kind: Sludge, x: 140.0, y: 70.0),
+
+                // 4. Skeletons (Bogged Archers)
+                (kind: Skeleton, x: 62.0, y: 70.0),
+                (kind: Skeleton, x: 214.0, y: 70.0),
+                (kind: Skeleton, x: 140.0, y: 48.0),
+            ],
+        ),
+
+        // =========================================================================
+        // PART 4: THE DREAD KEEP (CASTLE BOSS AREA)
+        // =========================================================================
+        // Gothic castle fortress with high battlements and a big grand stage at center.
+        (
+            id: CastleKeep,
+            name: "The Dread Keep",
+            subtitle: "Gothic fortress of shattered thrones; an arena crowned in shadow",
+            width: 260,
+            height: 190,
+            ambient_color: (28, 22, 38), // Dramatic gothic violet-indigo
+            bonfire: Some((
+                x: 130.0,
+                y: 158.0,
+                name: "Dread Keep Antechamber Bonfire",
+            )),
+            player_spawn: (130.0, 144.0),
+            colosseum_gate: None,
+            fog_wall: Some((
+                x: 130.0,
+                y: 20.0,
+                width: 36.0,
+                target_part: CastleKeep, // Sealed throne sanctum
+                target_spawn: (130.0, 144.0),
+                prompt: "Throne Gate is sealed by ancient dark magic",
+            )),
+            return_fog_wall: Some((
+                x: 130.0,
+                y: 176.0,
+                width: 36.0,
+                target_part: DeepForest,
+                target_spawn: (140.0, 36.0),
+                prompt: "Traverse Fog Wall to The Gloomwood Deep",
+            )),
+            stage_center: Some((130.0, 84.0)),
+            stage_radius: Some(38.0),
+            torches: [
+                // Roaring castle wall braziers casting violet/amber illumination
+                (x: 94.0, y: 56.0, radius: 52.0, intensity: 0.95, color: (255, 140, 40), flicker: 0.09),
+                (x: 166.0, y: 56.0, radius: 52.0, intensity: 0.95, color: (255, 140, 40), flicker: 0.09),
+                (x: 94.0, y: 112.0, radius: 52.0, intensity: 0.95, color: (255, 140, 40), flicker: 0.09),
+                (x: 166.0, y: 112.0, radius: 52.0, intensity: 0.95, color: (255, 140, 40), flicker: 0.09),
+                // Center stage spotlight
+                (x: 130.0, y: 84.0, radius: 46.0, intensity: 0.70, color: (170, 190, 240), flicker: 0.04),
+            ],
+            props: [
+                // Grand Gothic Castle Columns flanking stage
+                (x: 78, y: 48, prop_type: CastlePillar),
+                (x: 176, y: 48, prop_type: CastlePillar),
+                (x: 78, y: 114, prop_type: CastlePillar),
+                (x: 176, y: 114, prop_type: CastlePillar),
+                (x: 58, y: 82, prop_type: CastlePillar),
+                (x: 196, y: 82, prop_type: CastlePillar),
+
+                // Gothic Gargoyles perched on plinths
+                (x: 90, y: 42, prop_type: GargoyleStatue),
+                (x: 164, y: 42, prop_type: GargoyleStatue),
+                (x: 90, y: 120, prop_type: GargoyleStatue),
+                (x: 164, y: 120, prop_type: GargoyleStatue),
+
+                // Roaring Castle Standing Braziers
+                (x: 94, y: 52, prop_type: CastleBrazier),
+                (x: 164, y: 52, prop_type: CastleBrazier),
+                (x: 94, y: 108, prop_type: CastleBrazier),
+                (x: 164, y: 108, prop_type: CastleBrazier),
+
+                // Royal Crimson Crest Banners
+                (x: 68, y: 38, prop_type: CastleBanner),
+                (x: 186, y: 38, prop_type: CastleBanner),
+                (x: 68, y: 124, prop_type: CastleBanner),
+                (x: 186, y: 124, prop_type: CastleBanner),
+            ],
+            enemy_spawns: [
+                // Castle Stage Elite Sentinels
+                (kind: Skeleton, x: 106.0, y: 72.0),
+                (kind: Skeleton, x: 154.0, y: 72.0),
+                (kind: Sludge, x: 130.0, y: 84.0),
+            ],
+        ),
+    ],
+)

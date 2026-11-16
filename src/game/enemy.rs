@@ -8,7 +8,7 @@ use crate::game::combat::{CombatData, HazardPuddle, HeightBand, Hurtbox, Project
 use crate::game::particles::ParticleSystem;
 use crate::game::world::World;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum EnemyKind {
     Sludge,
     Skeleton,

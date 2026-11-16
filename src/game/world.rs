@@ -35,6 +35,7 @@ pub struct PropInstance {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PropType {
+    // Colosseum Props
     ColosseumArch,
     BrokenColumn,
     GateOfTrials,
@@ -47,6 +48,34 @@ pub enum PropType {
     HangingCage,
     WallTorch,
     FallenArchRubble,
+
+    // First Area Props (Part 1: Chapel)
+    ChapelAltar,
+    ChapelPew,
+    GraveStone,
+    RottingCorpse,
+    ChapelArch,
+
+    // First Area Props (Part 2: Autumn Woods)
+    AutumnTree,
+    FallenLog,
+    BrokenCart,
+    WoodenFence,
+
+    // First Area Props (Part 3: Deep Forest)
+    GnarledTree,
+    GlowingMushrooms,
+    RootBriar,
+    RottenStump,
+
+    // First Area Props (Part 4: Castle Boss Area)
+    CastlePillar,
+    GargoyleStatue,
+    CastleBrazier,
+    CastleBanner,
+
+    // Fog Wall
+    FogWallGate,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -149,6 +178,136 @@ impl ColosseumConfig {
                 },
             ],
             props: vec![],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ForestPartId {
+    Chapel,
+    AutumnWoods,
+    DeepForest,
+    CastleKeep,
+}
+
+impl ForestPartId {
+    pub fn display_title(&self) -> &'static str {
+        match self {
+            ForestPartId::Chapel => "THE DESECRATED CHAPEL",
+            ForestPartId::AutumnWoods => "THE AUTUMNAL WOODS",
+            ForestPartId::DeepForest => "THE GLOOMWOOD DEEP",
+            ForestPartId::CastleKeep => "THE DREAD KEEP",
+        }
+    }
+
+    pub fn next(&self) -> Option<ForestPartId> {
+        match self {
+            ForestPartId::Chapel => Some(ForestPartId::AutumnWoods),
+            ForestPartId::AutumnWoods => Some(ForestPartId::DeepForest),
+            ForestPartId::DeepForest => Some(ForestPartId::CastleKeep),
+            ForestPartId::CastleKeep => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FogWallConfig {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub target_part: ForestPartId,
+    pub target_spawn: (f32, f32),
+    pub prompt: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EnemySpawnConfig {
+    pub kind: crate::game::enemy::EnemyKind,
+    pub x: f32,
+    pub y: f32,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ForestPartConfig {
+    pub id: ForestPartId,
+    pub name: String,
+    pub subtitle: String,
+    pub width: usize,
+    pub height: usize,
+    pub ambient_color: (u8, u8, u8),
+    pub bonfire: Option<BonfireConfig>,
+    pub player_spawn: (f32, f32),
+    pub colosseum_gate: Option<(f32, f32)>,
+    pub fog_wall: Option<FogWallConfig>,
+    pub return_fog_wall: Option<FogWallConfig>,
+    pub stage_center: Option<(f32, f32)>,
+    pub stage_radius: Option<f32>,
+    pub torches: Vec<TorchConfig>,
+    pub props: Vec<PropConfig>,
+    pub enemy_spawns: Vec<EnemySpawnConfig>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BonfireConfig {
+    pub x: f32,
+    pub y: f32,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ForestAreaConfig {
+    pub title: String,
+    pub parts: Vec<ForestPartConfig>,
+}
+
+impl ForestAreaConfig {
+    pub fn load() -> Self {
+        if let Some(cfg) = std::fs::read_to_string("data/areas/forest.ron")
+            .ok()
+            .and_then(|content| ron::from_str::<ForestAreaConfig>(&content).ok())
+        {
+            return cfg;
+        }
+        Self::fallback_default()
+    }
+
+    pub fn get_part(&self, id: ForestPartId) -> Option<&ForestPartConfig> {
+        self.parts.iter().find(|p| p.id == id)
+    }
+
+    pub fn fallback_default() -> Self {
+        Self {
+            title: "The Dilapidated Forest & The Dread Keep".to_string(),
+            parts: vec![
+                ForestPartConfig {
+                    id: ForestPartId::Chapel,
+                    name: "The Desecrated Chapel".to_string(),
+                    subtitle: "Resting place of forgotten saints, now swarming with carrion and rot".to_string(),
+                    width: 240,
+                    height: 180,
+                    ambient_color: (32, 34, 46),
+                    bonfire: Some(BonfireConfig { x: 120.0, y: 142.0, name: "Chapel Courtyard Bonfire".to_string() }),
+                    player_spawn: (120.0, 130.0),
+                    colosseum_gate: Some((120.0, 168.0)),
+                    fog_wall: Some(FogWallConfig {
+                        x: 120.0,
+                        y: 24.0,
+                        width: 34.0,
+                        target_part: ForestPartId::AutumnWoods,
+                        target_spawn: (130.0, 158.0),
+                        prompt: "Traverse Fog Wall to The Autumnal Woods".to_string(),
+                    }),
+                    return_fog_wall: None,
+                    stage_center: None,
+                    stage_radius: None,
+                    torches: vec![
+                        TorchConfig { x: 80.0, y: 52.0, radius: 44.0, intensity: 0.85, color: (255, 150, 40), flicker: 0.08 },
+                        TorchConfig { x: 160.0, y: 52.0, radius: 44.0, intensity: 0.85, color: (255, 150, 40), flicker: 0.08 },
+                    ],
+                    props: vec![],
+                    enemy_spawns: vec![],
+                },
+            ],
         }
     }
 }
@@ -347,6 +506,28 @@ impl World {
                 PropType::HangingCage => (14, 24, 20, 8.0, 6.0, true),
                 PropType::WallTorch => (8, 14, 12, 0.0, 0.0, false), // Mounted on wall!
                 PropType::FallenArchRubble => (20, 12, 10, 16.0, 8.0, true),
+                // First Area (Chapel)
+                PropType::ChapelAltar => (30, 22, 20, 24.0, 10.0, true),
+                PropType::ChapelPew => (24, 16, 14, 20.0, 8.0, true),
+                PropType::GraveStone => (16, 22, 20, 12.0, 6.0, true),
+                PropType::RottingCorpse => (24, 14, 12, 0.0, 0.0, false), // Walkable!
+                PropType::ChapelArch => (32, 38, 36, 26.0, 10.0, true),
+                // First Area (Autumn Woods)
+                PropType::AutumnTree => (34, 42, 40, 10.0, 8.0, true),
+                PropType::FallenLog => (26, 14, 12, 22.0, 8.0, true),
+                PropType::BrokenCart => (26, 20, 18, 20.0, 10.0, true),
+                PropType::WoodenFence => (22, 16, 14, 20.0, 4.0, true),
+                // First Area (Deep Forest)
+                PropType::GnarledTree => (38, 46, 44, 14.0, 10.0, true),
+                PropType::GlowingMushrooms => (20, 18, 16, 0.0, 0.0, false), // Walkable!
+                PropType::RootBriar => (24, 18, 16, 18.0, 8.0, true),
+                PropType::RottenStump => (18, 16, 14, 14.0, 8.0, true),
+                // First Area (Castle Boss Area)
+                PropType::CastlePillar => (20, 40, 38, 16.0, 10.0, true),
+                PropType::GargoyleStatue => (20, 28, 26, 14.0, 8.0, true),
+                PropType::CastleBrazier => (16, 26, 24, 10.0, 8.0, true),
+                PropType::CastleBanner => (14, 34, 32, 0.0, 0.0, false),
+                PropType::FogWallGate => (38, 36, 34, 0.0, 0.0, false),
             };
 
             let base_y = p.y + base_off;
@@ -403,6 +584,357 @@ impl World {
             nav_grid,
             torch_lights,
             light_shafts: config.light_shafts,
+        }
+    }
+
+    /// Builds a world area for one of the 4 parts of the Dilapidated Forest / Dread Keep.
+    pub fn build_forest_part(part_cfg: &ForestPartConfig) -> Self {
+        let eff_w = part_cfg.width;
+        let eff_h = part_cfg.height;
+
+        let mut ground_pixels = vec![Palette::VOID_BLACK; eff_w * eff_h];
+        let mut props = Vec::with_capacity(part_cfg.props.len() + 16);
+        let mut colliders = Vec::with_capacity(part_cfg.props.len() + 32);
+        let mut nav_grid = NavGrid::new(eff_w as f32, eff_h as f32, 4.0);
+
+        let cx = eff_w as f32 * 0.5;
+        let cy = eff_h as f32 * 0.5;
+
+        // Ground generation per part
+        match part_cfg.id {
+            ForestPartId::Chapel => {
+                // Desecrated Chapel: Ruined gothic stone floor, nave flagstones, blood pools near corpses, mossy graveyard perimeter
+                for y in 0..eff_h {
+                    let row = y * eff_w;
+                    for x in 0..eff_w {
+                        let dx = (x as f32 - cx).abs();
+                        let dy = (y as f32 - cy).abs();
+
+                        let col = if dx < 75.0 && dy < 72.0 {
+                            let flagstone = (x / 12 + y / 8) % 4 == 0 && (x % 12 > 1 && y % 8 > 1);
+                            let crack = ((x * 17 + y * 31) % 67) == 0;
+                            if crack {
+                                Palette::STONE_CRACK
+                            } else if flagstone {
+                                if (x + y) % 3 == 0 {
+                                    Palette::STONE_WARM_MID
+                                } else {
+                                    Palette::CAVEA_STONE_MID
+                                }
+                            } else if (x + y) % 2 == 0 {
+                                Palette::CAVEA_STONE_DARK
+                            } else {
+                                Palette::STONE_COOL_DARK
+                            }
+                        } else if dx < 95.0 && dy < 85.0 {
+                            // Overgrown churchyard grounds with moss and dirt
+                            let moss = ((x * 19 + y * 23) % 19) == 0;
+                            if moss {
+                                Palette::MOSS_GREEN_MID
+                            } else if (x + y) % 3 == 0 {
+                                Palette::WEED_DARK
+                            } else {
+                                Palette::ARENA_SAND_DARK
+                            }
+                        } else {
+                            // Void boundary
+                            Palette::VOID_BLACK
+                        };
+
+                        ground_pixels[row + x] = col;
+                    }
+                }
+
+                // Desecrated nave central aisle
+                for y in 35..155 {
+                    let row = y * eff_w;
+                    for x in (cx as usize - 9)..=(cx as usize + 9) {
+                        let dist = (x as i32 - cx as i32).abs();
+                        if dist == 9 {
+                            ground_pixels[row + x] = Palette::STONE_WARM_LIGHT;
+                        } else {
+                            ground_pixels[row + x] = if (x + y) % 2 == 0 {
+                                Palette::CAVEA_STONE_LIGHT
+                            } else {
+                                Palette::CAVEA_STONE_MID
+                            };
+                        }
+                    }
+                }
+            }
+
+            ForestPartId::AutumnWoods => {
+                // Autumnal Woods: golden rust, burnt orange leaves carpeted over dark loam, winding trail
+                for y in 0..eff_h {
+                    let row = y * eff_w;
+                    for x in 0..eff_w {
+                        let dx = (x as f32 - cx).abs();
+                        let dy = (y as f32 - cy).abs();
+
+                        let col = if dx < 105.0 && dy < 82.0 {
+                            let leaf_noise = ((x * 23 + y * 41) ^ ((x >> 2) + (y >> 2))) % 97;
+                            if leaf_noise < 20 {
+                                Color::rgb(225, 135, 42) // golden amber
+                            } else if leaf_noise < 45 {
+                                Color::rgb(180, 75, 26)  // rust
+                            } else if leaf_noise < 65 {
+                                Color::rgb(130, 48, 20)  // burnt umber
+                            } else if leaf_noise < 80 {
+                                Palette::ARENA_SAND_MID  // dry trail soil
+                            } else {
+                                Palette::ARENA_SAND_DARK
+                            }
+                        } else {
+                            Palette::VOID_BLACK
+                        };
+
+                        ground_pixels[row + x] = col;
+                    }
+                }
+
+                // Winding forest trail through glade
+                for y in 25..170 {
+                    let trail_cx = (cx + ((y as f32 * 0.08).sin() * 14.0)).round() as usize;
+                    let row = y * eff_w;
+                    for x in trail_cx.saturating_sub(7)..=(trail_cx + 7).min(eff_w - 1) {
+                        let dist = (x as i32 - trail_cx as i32).abs();
+                        ground_pixels[row + x] = if dist >= 6 {
+                            Color::rgb(140, 60, 25)
+                        } else if (x + y) % 2 == 0 {
+                            Palette::ARENA_SAND_LIGHT
+                        } else {
+                            Palette::ARENA_SAND_MID
+                        };
+                    }
+                }
+            }
+
+            ForestPartId::DeepForest => {
+                // Gloomwood Deep: dark teal-black peat bog, murky stagnant water pools, glowing lichen
+                for y in 0..eff_h {
+                    let row = y * eff_w;
+                    for x in 0..eff_w {
+                        let dx = (x as f32 - cx).abs();
+                        let dy = (y as f32 - cy).abs();
+
+                        let col = if dx < 118.0 && dy < 88.0 {
+                            let peat_noise = ((x * 37 + y * 47) ^ (x >> 1)) % 89;
+                            let root = ((x * 11 + y * 7) % 31) == 0;
+                            let lichen = ((x * 13 + y * 29) % 43) == 0;
+
+                            // Murky swamp puddles
+                            let in_puddle = ((x as i32 - 110).pow(2) + (y as i32 - 130).pow(2) * 2) < 45
+                                || ((x as i32 - 175).pow(2) + (y as i32 - 95).pow(2) * 2) < 40;
+
+                            if in_puddle {
+                                if (x + y) % 3 == 0 {
+                                    Color::rgb(26, 42, 38)
+                                } else {
+                                    Color::rgb(18, 30, 26)
+                                }
+                            } else if lichen {
+                                Color::rgb(42, 110, 80) // faint bioluminescent glow
+                            } else if root {
+                                Color::rgb(35, 45, 38)
+                            } else if peat_noise < 40 {
+                                Color::rgb(18, 24, 22)
+                            } else if peat_noise < 75 {
+                                Color::rgb(14, 18, 16)
+                            } else {
+                                Color::rgb(24, 32, 28)
+                            }
+                        } else {
+                            Palette::VOID_BLACK
+                        };
+
+                        ground_pixels[row + x] = col;
+                    }
+                }
+            }
+
+            ForestPartId::CastleKeep => {
+                // The Dread Keep: Gothic obsidian & slate paving, grand elevated central stage
+                for y in 0..eff_h {
+                    let row = y * eff_w;
+                    for x in 0..eff_w {
+                        let dx = (x as f32 - cx).abs();
+                        let dy = (y as f32 - cy).abs();
+
+                        let col = if dx < 105.0 && dy < 82.0 {
+                            let diamond = (x / 8 + y / 8) % 2 == 0;
+                            let flag = x % 16 > 1 && y % 12 > 1;
+                            if flag && diamond {
+                                Color::rgb(42, 45, 58)
+                            } else if flag {
+                                Color::rgb(28, 30, 40)
+                            } else {
+                                Color::rgb(18, 20, 26)
+                            }
+                        } else {
+                            Palette::VOID_BLACK
+                        };
+
+                        ground_pixels[row + x] = col;
+                    }
+                }
+
+                // Grand Central Boss Stage: elevated circular dais with steps and heraldic mosaic
+                if let (Some(stage_pos), Some(stage_r)) = (part_cfg.stage_center, part_cfg.stage_radius) {
+                    let sx = stage_pos.0;
+                    let sy = stage_pos.1;
+                    let sr_y = stage_r * 0.72; // perspective flatten
+
+                    let min_y = (sy - sr_y - 4.0).max(0.0) as usize;
+                    let max_y = (sy + sr_y + 4.0).min(eff_h as f32 - 1.0) as usize;
+                    let min_x = (sx - stage_r - 4.0).max(0.0) as usize;
+                    let max_x = (sx + stage_r + 4.0).min(eff_w as f32 - 1.0) as usize;
+
+                    for y in min_y..=max_y {
+                        let dy = (y as f32 - sy) / sr_y;
+                        let row = y * eff_w;
+                        for x in min_x..=max_x {
+                            let dx = (x as f32 - sx) / stage_r;
+                            let d2 = dx * dx + dy * dy;
+
+                            if d2 <= 1.05 {
+                                let col = if d2 > 0.88 {
+                                    // Outer step riser
+                                    if (x + y) % 2 == 0 {
+                                        Palette::STONE_WARM_LIGHT
+                                    } else {
+                                        Palette::STONE_COOL_DARK
+                                    }
+                                } else if d2 > 0.65 {
+                                    // Middle step tread
+                                    if (x + y) % 3 == 0 {
+                                        Palette::STONE_WARM_MID
+                                    } else {
+                                        Palette::CAVEA_STONE_MID
+                                    }
+                                } else if d2 > 0.22 {
+                                    // Grand Stage Platform (polished heraldic stone)
+                                    let pattern = (x / 6 + y / 6) % 2 == 0;
+                                    if pattern {
+                                        Color::rgb(60, 66, 88)
+                                    } else {
+                                        Color::rgb(38, 42, 56)
+                                    }
+                                } else {
+                                    // Central Heraldic Sigil Star
+                                    if (x + y) % 2 == 0 {
+                                        Palette::GOLD_TRIM
+                                    } else {
+                                        Color::rgb(140, 30, 40)
+                                    }
+                                };
+                                ground_pixels[row + x] = col;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Perimeter boundary colliders with entrance and exit portals
+        let margin = 14.0;
+        let w_f = eff_w as f32;
+        let h_f = eff_h as f32;
+
+        // Left and Right border walls
+        colliders.push(Collider::new(0.0, 0.0, margin, h_f));
+        colliders.push(Collider::new(w_f - margin, 0.0, margin, h_f));
+
+        // Top wall with gap for northern fog wall
+        let fog_x = part_cfg.fog_wall.as_ref().map(|f| f.x).unwrap_or(cx);
+        let top_gap_w = 44.0;
+        colliders.push(Collider::new(margin, 0.0, (fog_x - top_gap_w * 0.5 - margin).max(0.0), margin));
+        colliders.push(Collider::new(fog_x + top_gap_w * 0.5, 0.0, (w_f - margin - (fog_x + top_gap_w * 0.5)).max(0.0), margin));
+
+        // Bottom wall with gap for entrance/return gate
+        let return_x = part_cfg.return_fog_wall.as_ref().map(|f| f.x)
+            .or_else(|| part_cfg.colosseum_gate.map(|g| g.0))
+            .unwrap_or(cx);
+        let bot_gap_w = 44.0;
+        colliders.push(Collider::new(margin, h_f - margin, (return_x - bot_gap_w * 0.5 - margin).max(0.0), margin));
+        colliders.push(Collider::new(return_x + bot_gap_w * 0.5, h_f - margin, (w_f - margin - (return_x + bot_gap_w * 0.5)).max(0.0), margin));
+
+        // Instantiate Props
+        for p in &part_cfg.props {
+            let (w, _h, base_off, col_w, col_h, has_col) = match p.prop_type {
+                PropType::GateOfTrials => (32, 34, 32, 28.0, 12.0, true),
+                PropType::ColosseumArch => (32, 36, 34, 24.0, 12.0, true),
+                PropType::BrokenColumn => (12, 26, 24, 8.0, 6.0, true),
+                PropType::WeaponRack => (18, 20, 18, 14.0, 8.0, true),
+                PropType::TrainingDummy => (12, 20, 18, 8.0, 8.0, true),
+                PropType::SpectatorStand => (28, 18, 16, 24.0, 10.0, true),
+                PropType::TatteredBanner => (14, 30, 28, 4.0, 6.0, true),
+                PropType::BonePile => (12, 10, 8, 0.0, 0.0, false),
+                PropType::HeadlessGladiator => (16, 28, 26, 10.0, 8.0, true),
+                PropType::HangingCage => (14, 24, 20, 8.0, 6.0, true),
+                PropType::WallTorch => (8, 14, 12, 0.0, 0.0, false),
+                PropType::FallenArchRubble => (20, 12, 10, 16.0, 8.0, true),
+                PropType::ChapelAltar => (30, 22, 20, 24.0, 10.0, true),
+                PropType::ChapelPew => (24, 16, 14, 20.0, 8.0, true),
+                PropType::GraveStone => (16, 22, 20, 12.0, 6.0, true),
+                PropType::RottingCorpse => (24, 14, 12, 0.0, 0.0, false),
+                PropType::ChapelArch => (32, 38, 36, 26.0, 10.0, true),
+                PropType::AutumnTree => (34, 42, 40, 10.0, 8.0, true),
+                PropType::FallenLog => (26, 14, 12, 22.0, 8.0, true),
+                PropType::BrokenCart => (26, 20, 18, 20.0, 10.0, true),
+                PropType::WoodenFence => (22, 16, 14, 20.0, 4.0, true),
+                PropType::GnarledTree => (38, 46, 44, 14.0, 10.0, true),
+                PropType::GlowingMushrooms => (20, 18, 16, 0.0, 0.0, false),
+                PropType::RootBriar => (24, 18, 16, 18.0, 8.0, true),
+                PropType::RottenStump => (18, 16, 14, 14.0, 8.0, true),
+                PropType::CastlePillar => (20, 40, 38, 16.0, 10.0, true),
+                PropType::GargoyleStatue => (20, 28, 26, 14.0, 8.0, true),
+                PropType::CastleBrazier => (16, 26, 24, 10.0, 8.0, true),
+                PropType::CastleBanner => (14, 34, 32, 0.0, 0.0, false),
+                PropType::FogWallGate => (38, 36, 34, 0.0, 0.0, false),
+            };
+
+            let base_y = p.y + base_off;
+            props.push(PropInstance {
+                x: p.x,
+                y: p.y,
+                base_y,
+                sprite_index: p.prop_type,
+            });
+
+            if has_col {
+                let cx_box = p.x as f32 + (w as f32 - col_w) * 0.5;
+                let cy_box = (base_y as f32) - col_h * 0.5;
+                colliders.push(Collider::new(cx_box, cy_box, col_w, col_h));
+            }
+        }
+
+        // Build NavGrid from colliders
+        for c in &colliders {
+            nav_grid.set_blocked_rect(c.x, c.y, c.x + c.w, c.y + c.h);
+        }
+
+        // Convert Torches to PointLights
+        let mut torch_lights = Vec::with_capacity(part_cfg.torches.len() + 2);
+        for t in &part_cfg.torches {
+            torch_lights.push(PointLight {
+                x: t.x,
+                y: t.y,
+                radius: t.radius,
+                intensity: t.intensity,
+                color: Color::rgb(t.color.0, t.color.1, t.color.2),
+                flicker_amount: t.flicker,
+            });
+        }
+
+        Self {
+            width: eff_w,
+            height: eff_h,
+            ground_pixels,
+            props,
+            colliders,
+            nav_grid,
+            torch_lights,
+            light_shafts: vec![],
         }
     }
 
@@ -540,6 +1072,24 @@ impl World {
                 PropType::HangingCage => (12.0, 18.0),
                 PropType::WallTorch => (6.0, 10.0),
                 PropType::FallenArchRubble => (18.0, 10.0),
+                PropType::ChapelAltar => (28.0, 18.0),
+                PropType::ChapelPew => (22.0, 14.0),
+                PropType::GraveStone => (14.0, 18.0),
+                PropType::RottingCorpse => (18.0, 8.0),
+                PropType::ChapelArch => (28.0, 34.0),
+                PropType::AutumnTree => (26.0, 38.0),
+                PropType::FallenLog => (24.0, 10.0),
+                PropType::BrokenCart => (22.0, 16.0),
+                PropType::WoodenFence => (20.0, 12.0),
+                PropType::GnarledTree => (32.0, 40.0),
+                PropType::GlowingMushrooms => (16.0, 12.0),
+                PropType::RootBriar => (20.0, 14.0),
+                PropType::RottenStump => (16.0, 12.0),
+                PropType::CastlePillar => (18.0, 36.0),
+                PropType::GargoyleStatue => (18.0, 24.0),
+                PropType::CastleBrazier => (14.0, 22.0),
+                PropType::CastleBanner => (10.0, 28.0),
+                PropType::FogWallGate => (34.0, 32.0),
             };
             casters.push(ShadowCaster {
                 x: p.x as f32 + w * 0.5,
@@ -571,6 +1121,24 @@ impl World {
             PropType::HangingCage => &bank.hanging_cage,
             PropType::WallTorch => &bank.wall_torch[banner_frame % 2],
             PropType::FallenArchRubble => &bank.fallen_arch_rubble,
+            PropType::ChapelAltar => &bank.chapel_altar,
+            PropType::ChapelPew => &bank.chapel_pew,
+            PropType::GraveStone => &bank.grave_stone,
+            PropType::RottingCorpse => &bank.rotting_corpse,
+            PropType::ChapelArch => &bank.chapel_arch,
+            PropType::AutumnTree => &bank.autumn_tree,
+            PropType::FallenLog => &bank.fallen_log,
+            PropType::BrokenCart => &bank.broken_cart,
+            PropType::WoodenFence => &bank.wooden_fence,
+            PropType::GnarledTree => &bank.gnarled_tree,
+            PropType::GlowingMushrooms => &bank.glowing_mushrooms[banner_frame % 2],
+            PropType::RootBriar => &bank.root_briar,
+            PropType::RottenStump => &bank.rotten_stump,
+            PropType::CastlePillar => &bank.castle_pillar,
+            PropType::GargoyleStatue => &bank.gargoyle_statue,
+            PropType::CastleBrazier => &bank.castle_brazier[banner_frame % 2],
+            PropType::CastleBanner => &bank.castle_banner[banner_frame % 2],
+            PropType::FogWallGate => &bank.fog_wall_gate,
         }
     }
 }

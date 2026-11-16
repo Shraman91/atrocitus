@@ -259,6 +259,26 @@ pub struct SpriteBank {
     pub wall_torch: [Sprite; 2],
     pub fallen_arch_rubble: Sprite,
 
+    // First Area (Gothic Chapel, Autumn Woods, Gloomwood Deep, Dread Keep)
+    pub chapel_altar: Sprite,
+    pub chapel_pew: Sprite,
+    pub grave_stone: Sprite,
+    pub rotting_corpse: Sprite,
+    pub chapel_arch: Sprite,
+    pub autumn_tree: Sprite,
+    pub fallen_log: Sprite,
+    pub broken_cart: Sprite,
+    pub wooden_fence: Sprite,
+    pub gnarled_tree: Sprite,
+    pub glowing_mushrooms: [Sprite; 2],
+    pub root_briar: Sprite,
+    pub rotten_stump: Sprite,
+    pub castle_pillar: Sprite,
+    pub gargoyle_statue: Sprite,
+    pub castle_brazier: [Sprite; 2],
+    pub castle_banner: [Sprite; 2],
+    pub fog_wall_gate: Sprite,
+
     // Enemies (Phase 3/4)
     // 1. Acid Sludge
     pub sludge_idle: [Sprite; 4],
@@ -513,6 +533,34 @@ impl SpriteBank {
                 generate_wall_torch(1),
             ],
             fallen_arch_rubble: generate_fallen_arch_rubble(),
+
+            chapel_altar: generate_chapel_altar(),
+            chapel_pew: generate_chapel_pew(),
+            grave_stone: generate_grave_stone(),
+            rotting_corpse: generate_rotting_corpse(),
+            chapel_arch: generate_chapel_arch(),
+            autumn_tree: generate_autumn_tree(),
+            fallen_log: generate_fallen_log(),
+            broken_cart: generate_broken_cart(),
+            wooden_fence: generate_wooden_fence(),
+            gnarled_tree: generate_gnarled_tree(),
+            glowing_mushrooms: [
+                generate_glowing_mushrooms(0),
+                generate_glowing_mushrooms(1),
+            ],
+            root_briar: generate_root_briar(),
+            rotten_stump: generate_rotten_stump(),
+            castle_pillar: generate_castle_pillar(),
+            gargoyle_statue: generate_gargoyle_statue(),
+            castle_brazier: [
+                generate_castle_brazier(0),
+                generate_castle_brazier(1),
+            ],
+            castle_banner: [
+                generate_castle_banner(0),
+                generate_castle_banner(1),
+            ],
+            fog_wall_gate: generate_fog_wall_gate(),
 
             sludge_idle: [
                 generate_sludge_idle(0),
@@ -1927,6 +1975,961 @@ fn generate_fallen_arch_rubble() -> Sprite {
     sp.pixels[7 * w + 4] = moss;
     sp.pixels[8 * w + 15] = moss;
     sp.pixels[9 * w + 16] = Palette::MOSS_GREEN_LIGHT;
+
+    sp
+}
+
+fn generate_chapel_altar() -> Sprite {
+    let w = 30;
+    let h = 22;
+    let mut sp = Sprite::new(w, h);
+    let stone_dark = Palette::STONE_COOL_DARK;
+    let stone_mid = Palette::CAVEA_STONE_MID;
+    let stone_light = Palette::STONE_WARM_LIGHT;
+    let cloth = Palette::ASH_WHITE;
+    let blood = Palette::BLOOD_STAIN;
+    let gold = Palette::GOLD_TRIM;
+
+    // Altar stone base plinth (steps)
+    for y in 14..22 {
+        for x in 2..28 {
+            if y == 21 || x == 2 || x == 27 {
+                sp.pixels[y * w + x] = stone_dark;
+            } else if y >= 18 {
+                sp.pixels[y * w + x] = if (x + y) % 3 == 0 { stone_light } else { stone_mid };
+            } else {
+                sp.pixels[y * w + x] = stone_mid;
+            }
+        }
+    }
+
+    // Carved gothic arch niches in plinth
+    for y in 15..19 {
+        for x in [6, 7, 14, 15, 22, 23] {
+            sp.pixels[y * w + x] = stone_dark;
+        }
+    }
+
+    // Altar top slab
+    for y in 8..14 {
+        for x in 1..29 {
+            if y == 8 || y == 13 || x == 1 || x == 28 {
+                sp.pixels[y * w + x] = stone_dark;
+            } else {
+                sp.pixels[y * w + x] = stone_mid;
+            }
+        }
+    }
+
+    // Desecrated Altar Cloth runner in center with blood stains
+    for y in 7..16 {
+        for x in 9..21 {
+            if x == 9 || x == 20 {
+                sp.pixels[y * w + x] = gold;
+            } else if (y > 9 && (x + y) % 4 == 0) || (y == 11 && (11..18).contains(&x)) {
+                sp.pixels[y * w + x] = blood;
+            } else {
+                sp.pixels[y * w + x] = cloth;
+            }
+        }
+    }
+
+    // Chalice and Candles on top
+    // Chalice (center)
+    sp.pixels[5 * w + 14] = gold;
+    sp.pixels[5 * w + 15] = gold;
+    sp.pixels[6 * w + 14] = gold;
+    sp.pixels[6 * w + 15] = gold;
+    sp.pixels[7 * w + 14] = gold;
+    sp.pixels[7 * w + 15] = gold;
+
+    // Left Candle with flame
+    sp.pixels[3 * w + 5] = Palette::TORCH_FLAME;
+    sp.pixels[4 * w + 5] = Palette::TORCH_CORE;
+    sp.pixels[5 * w + 5] = cloth;
+    sp.pixels[6 * w + 5] = cloth;
+    sp.pixels[7 * w + 5] = stone_dark;
+
+    // Right Candle with flame
+    sp.pixels[3 * w + 24] = Palette::TORCH_FLAME;
+    sp.pixels[4 * w + 24] = Palette::TORCH_CORE;
+    sp.pixels[5 * w + 24] = cloth;
+    sp.pixels[6 * w + 24] = cloth;
+    sp.pixels[7 * w + 24] = stone_dark;
+
+    sp
+}
+
+fn generate_chapel_pew() -> Sprite {
+    let w = 24;
+    let h = 16;
+    let mut sp = Sprite::new(w, h);
+    let wood_dark = Color::rgb(38, 25, 18);
+    let wood_mid = Color::rgb(64, 44, 30);
+    let wood_light = Color::rgb(95, 68, 48);
+    let moss = Palette::MOSS_GREEN_MID;
+
+    // End panels (carved trefoil gothic silhouette)
+    for y in 4..16 {
+        for x in [2, 3, 20, 21] {
+            if y == 15 || y == 4 || x == 2 || x == 21 {
+                sp.pixels[y * w + x] = wood_dark;
+            } else {
+                sp.pixels[y * w + x] = wood_mid;
+            }
+        }
+    }
+    sp.pixels[3 * w + 3] = wood_light;
+    sp.pixels[3 * w + 20] = wood_light;
+
+    // Bench seat and backrest planks
+    for y in 6..12 {
+        for x in 4..20 {
+            if y == 6 || y == 11 {
+                sp.pixels[y * w + x] = wood_dark;
+            } else if (x + y) % 3 == 0 {
+                sp.pixels[y * w + x] = wood_light;
+            } else {
+                sp.pixels[y * w + x] = wood_mid;
+            }
+        }
+    }
+
+    // Fractured wood splinter gap
+    sp.pixels[8 * w + 11] = wood_dark;
+    sp.pixels[9 * w + 11] = wood_dark;
+    sp.pixels[9 * w + 12] = Palette::VOID_BLACK;
+
+    // Moss on foot
+    sp.pixels[14 * w + 4] = moss;
+    sp.pixels[15 * w + 4] = moss;
+    sp.pixels[15 * w + 5] = Palette::MOSS_GREEN_LIGHT;
+
+    sp
+}
+
+fn generate_grave_stone() -> Sprite {
+    let w = 16;
+    let h = 22;
+    let mut sp = Sprite::new(w, h);
+    let dark = Palette::STONE_COOL_DARK;
+    let mid = Palette::CAVEA_STONE_MID;
+    let light = Palette::STONE_WARM_LIGHT;
+    let crack = Palette::STONE_CRACK;
+    let moss = Palette::MOSS_GREEN_MID;
+
+    // Arched tombstone outline
+    for y in 4..22 {
+        for x in 2..14 {
+            let in_arch = if y < 8 {
+                (4..=11).contains(&x) || (y >= 6 && (3..=12).contains(&x))
+            } else {
+                true
+            };
+
+            if in_arch {
+                if y == 21 || x == 2 || x == 13 || (y == 4 && (5..=10).contains(&x)) {
+                    sp.pixels[y * w + x] = dark;
+                } else if (x + y) % 4 == 0 {
+                    sp.pixels[y * w + x] = light;
+                } else {
+                    sp.pixels[y * w + x] = mid;
+                }
+            }
+        }
+    }
+
+    // Inset carved cross
+    for y in 8..15 {
+        sp.pixels[y * w + 8] = crack;
+    }
+    for x in 6..11 {
+        sp.pixels[10 * w + x] = crack;
+    }
+
+    // Weathered diagonal crack
+    sp.pixels[15 * w + 9] = crack;
+    sp.pixels[16 * w + 10] = crack;
+    sp.pixels[17 * w + 11] = crack;
+
+    // Moss at ground line
+    sp.pixels[20 * w + 3] = moss;
+    sp.pixels[21 * w + 3] = moss;
+    sp.pixels[21 * w + 4] = Palette::MOSS_GREEN_LIGHT;
+    sp.pixels[20 * w + 12] = moss;
+    sp.pixels[21 * w + 12] = moss;
+
+    sp
+}
+
+fn generate_rotting_corpse() -> Sprite {
+    let w = 24;
+    let h = 14;
+    let mut sp = Sprite::new(w, h);
+    let blood_dark = Palette::BLOOD_STAIN;
+    let blood_mid = Color::rgb(72, 16, 20);
+    let cloth_dark = Color::rgb(42, 38, 48);
+    let cloth_mid = Color::rgb(65, 58, 70);
+    let bone = Palette::BONE_WHITE;
+    let rot = Color::rgb(48, 58, 40);
+
+    // Dried blood pool spreading on flagstones
+    for y in 5..14 {
+        for x in 1..23 {
+            let dx = (x as i32 - 12).abs();
+            let dy = (y as i32 - 9).abs();
+            if dx * dx + dy * dy * 3 < 70 {
+                sp.pixels[y * w + x] = if (x + y) % 2 == 0 { blood_dark } else { blood_mid };
+            }
+        }
+    }
+
+    // Prone torso in tattered tunic
+    for y in 4..10 {
+        for x in 7..17 {
+            if y == 4 || y == 9 || x == 7 || x == 16 {
+                sp.pixels[y * w + x] = cloth_dark;
+            } else if (x + y) % 3 == 0 {
+                sp.pixels[y * w + x] = rot;
+            } else {
+                sp.pixels[y * w + x] = cloth_mid;
+            }
+        }
+    }
+
+    // Exposed ribcage bones
+    sp.pixels[5 * w + 10] = bone;
+    sp.pixels[6 * w + 10] = bone;
+    sp.pixels[5 * w + 13] = bone;
+    sp.pixels[6 * w + 13] = bone;
+
+    // Fallen skull on left
+    for y in 5..9 {
+        for x in 3..7 {
+            sp.pixels[y * w + x] = bone;
+        }
+    }
+    sp.pixels[6 * w + 4] = Palette::VOID_BLACK; // eye socket
+    sp.pixels[6 * w + 6] = Palette::VOID_BLACK;
+    sp.pixels[8 * w + 5] = Palette::VOID_BLACK; // jaw crack
+
+    // Splayed legs on right
+    sp.pixels[7 * w + 18] = cloth_dark;
+    sp.pixels[7 * w + 19] = cloth_mid;
+    sp.pixels[8 * w + 20] = bone;
+    sp.pixels[9 * w + 18] = cloth_dark;
+    sp.pixels[10 * w + 19] = bone;
+
+    sp
+}
+
+fn generate_chapel_arch() -> Sprite {
+    let w = 32;
+    let h = 38;
+    let mut sp = Sprite::new(w, h);
+    let dark = Palette::STONE_COOL_DARK;
+    let mid = Palette::CAVEA_STONE_MID;
+    let light = Palette::STONE_COOL_LIGHT;
+    let moss = Palette::MOSS_GREEN_MID;
+
+    // Twin stone piers on left and right
+    for y in 0..38 {
+        for x in 0..6 {
+            if x == 0 || x == 5 || y == 37 {
+                sp.pixels[y * w + x] = dark;
+            } else if (x + y) % 3 == 0 {
+                sp.pixels[y * w + x] = light;
+            } else {
+                sp.pixels[y * w + x] = mid;
+            }
+        }
+        for x in 26..32 {
+            if x == 26 || x == 31 || y == 37 {
+                sp.pixels[y * w + x] = dark;
+            } else if (x + y) % 3 == 0 {
+                sp.pixels[y * w + x] = light;
+            } else {
+                sp.pixels[y * w + x] = mid;
+            }
+        }
+    }
+
+    // Pointed gothic arch curve overhead
+    for x in 6..26 {
+        let dist_from_center = (x as i32 - 16).abs();
+        let arch_y = (dist_from_center * 14) / 10;
+        for y in (arch_y as usize)..=(arch_y as usize + 6).min(37) {
+            if y == arch_y as usize || y == arch_y as usize + 6 {
+                sp.pixels[y * w + x] = dark;
+            } else if (x + y) % 2 == 0 {
+                sp.pixels[y * w + x] = light;
+            } else {
+                sp.pixels[y * w + x] = mid;
+            }
+        }
+    }
+
+    // Gothic trefoil cusps hanging in arch
+    sp.pixels[9 * w + 15] = light;
+    sp.pixels[9 * w + 16] = light;
+    sp.pixels[10 * w + 15] = dark;
+    sp.pixels[10 * w + 16] = dark;
+
+    // Moss on pier bases
+    sp.pixels[35 * w + 3] = moss;
+    sp.pixels[36 * w + 3] = moss;
+    sp.pixels[35 * w + 28] = moss;
+
+    sp
+}
+
+fn generate_autumn_tree() -> Sprite {
+    let w = 34;
+    let h = 42;
+    let mut sp = Sprite::new(w, h);
+    let bark_dark = Color::rgb(35, 30, 32);
+    let bark_mid = Color::rgb(145, 150, 158); // pale silver birch
+    let bark_light = Color::rgb(195, 200, 208);
+    let knot = Color::rgb(48, 38, 36);
+
+    // Autumn leaf palette
+    let leaf_amber = Color::rgb(240, 175, 55);
+    let leaf_orange = Color::rgb(215, 115, 35);
+    let leaf_rust = Color::rgb(175, 65, 25);
+    let leaf_dark = Color::rgb(105, 38, 20);
+
+    // Slender birch trunk
+    for y in 14..42 {
+        let cx = 17;
+        let trunk_w = if y > 36 { 3 } else { 2 };
+        for x in (cx - trunk_w)..=(cx + trunk_w) {
+            if x == cx - trunk_w || x == cx + trunk_w || y == 41 {
+                sp.pixels[y * w + x] = bark_dark;
+            } else if (y % 6 == 0) && x == cx {
+                sp.pixels[y * w + x] = knot;
+            } else if x == cx - trunk_w + 1 {
+                sp.pixels[y * w + x] = bark_light;
+            } else {
+                sp.pixels[y * w + x] = bark_mid;
+            }
+        }
+    }
+
+    // Spreading branches
+    for (bx, by) in [(13, 20), (12, 19), (11, 18), (21, 22), (22, 21), (23, 20)] {
+        sp.pixels[by * w + bx] = bark_dark;
+    }
+
+    // Autumn foliage clusters (golden rust fall canopy)
+    for y in 2..22 {
+        for x in 3..31 {
+            let dx = (x as i32 - 17).abs();
+            let dy = (y as i32 - 12).abs();
+            let d = dx * dx + dy * dy * 2;
+            if d < 130 {
+                let noise = ((x * 13 + y * 29) ^ (x * 7)) % 7;
+                let col = if d > 105 || noise == 0 {
+                    leaf_dark
+                } else if noise <= 2 {
+                    leaf_rust
+                } else if noise <= 4 {
+                    leaf_orange
+                } else {
+                    leaf_amber
+                };
+                sp.pixels[y * w + x] = col;
+            }
+        }
+    }
+
+    sp
+}
+
+fn generate_fallen_log() -> Sprite {
+    let w = 26;
+    let h = 14;
+    let mut sp = Sprite::new(w, h);
+    let bark_dark = Color::rgb(34, 24, 18);
+    let bark_mid = Color::rgb(58, 42, 30);
+    let bark_light = Color::rgb(88, 64, 46);
+    let moss = Palette::MOSS_GREEN_MID;
+    let shroom = Color::rgb(220, 145, 55);
+
+    // Horizontal log body
+    for y in 4..14 {
+        for x in 2..24 {
+            if y == 4 || y == 13 || x == 2 || x == 23 {
+                sp.pixels[y * w + x] = bark_dark;
+            } else if y <= 7 {
+                sp.pixels[y * w + x] = if (x + y) % 3 == 0 { bark_light } else { bark_mid };
+            } else {
+                sp.pixels[y * w + x] = bark_mid;
+            }
+        }
+    }
+
+    // Hollow decayed end on left
+    for y in 6..12 {
+        for x in 3..6 {
+            sp.pixels[y * w + x] = Palette::VOID_BLACK;
+        }
+    }
+
+    // Moss along upper rim
+    sp.pixels[5 * w + 8] = moss;
+    sp.pixels[5 * w + 9] = moss;
+    sp.pixels[5 * w + 15] = Palette::MOSS_GREEN_LIGHT;
+    sp.pixels[5 * w + 16] = moss;
+
+    // Small wild bracket mushrooms
+    sp.pixels[7 * w + 18] = shroom;
+    sp.pixels[7 * w + 19] = shroom;
+    sp.pixels[8 * w + 19] = bark_dark;
+
+    sp
+}
+
+fn generate_broken_cart() -> Sprite {
+    let w = 26;
+    let h = 20;
+    let mut sp = Sprite::new(w, h);
+    let wood_dark = Color::rgb(42, 28, 20);
+    let wood_mid = Color::rgb(72, 50, 36);
+    let wood_light = Color::rgb(105, 75, 54);
+    let iron = Palette::IRON_MID;
+
+    // Wooden cart body (tilted / wrecked)
+    for y in 6..14 {
+        for x in 4..20 {
+            if y == 6 || y == 13 || x == 4 || x == 19 {
+                sp.pixels[y * w + x] = wood_dark;
+            } else if (x + y) % 2 == 0 {
+                sp.pixels[y * w + x] = wood_light;
+            } else {
+                sp.pixels[y * w + x] = wood_mid;
+            }
+        }
+    }
+
+    // Shattered spoked wheel lying on side
+    for y in 10..19 {
+        for x in 16..25 {
+            let dx = x as i32 - 20;
+            let dy = y as i32 - 14;
+            let d = dx * dx + dy * dy;
+            if (12..=18).contains(&d) {
+                sp.pixels[y * w + x] = iron; // iron wheel rim
+            } else if d <= 3 || (dx.abs() == 0 && d <= 12) || (dy.abs() == 0 && d <= 12) {
+                sp.pixels[y * w + x] = wood_dark; // spokes and hub
+            }
+        }
+    }
+
+    // Left cart axle post resting on ground
+    for y in 14..19 {
+        sp.pixels[y * w + 6] = wood_dark;
+        sp.pixels[y * w + 7] = wood_mid;
+    }
+
+    sp
+}
+
+fn generate_wooden_fence() -> Sprite {
+    let w = 22;
+    let h = 16;
+    let mut sp = Sprite::new(w, h);
+    let wood_dark = Color::rgb(36, 26, 18);
+    let wood_mid = Color::rgb(62, 45, 32);
+    let wood_light = Color::rgb(90, 68, 50);
+    let moss = Palette::MOSS_GREEN_MID;
+
+    // Vertical posts at x=3,4 and x=18,19
+    for y in 2..16 {
+        for x in [3, 4, 18, 19] {
+            if y == 2 || y == 15 || x == 3 || x == 18 {
+                sp.pixels[y * w + x] = wood_dark;
+            } else {
+                sp.pixels[y * w + x] = wood_mid;
+            }
+        }
+    }
+
+    // Horizontal split rails
+    for x in 4..19 {
+        // Upper rail
+        sp.pixels[5 * w + x] = wood_dark;
+        sp.pixels[6 * w + x] = wood_light;
+        sp.pixels[7 * w + x] = wood_dark;
+
+        // Lower rail
+        sp.pixels[10 * w + x] = wood_dark;
+        sp.pixels[11 * w + x] = wood_mid;
+        sp.pixels[12 * w + x] = wood_dark;
+    }
+
+    sp.pixels[14 * w + 5] = moss;
+    sp.pixels[15 * w + 5] = moss;
+
+    sp
+}
+
+fn generate_gnarled_tree() -> Sprite {
+    let w = 38;
+    let h = 46;
+    let mut sp = Sprite::new(w, h);
+    let dark = Color::rgb(22, 24, 28);
+    let mid = Color::rgb(42, 45, 52);
+    let light = Color::rgb(65, 70, 80);
+    let moss = Color::rgb(35, 58, 42);
+
+    // Thick twisted trunk
+    for y in 16..46 {
+        let cx = 19;
+        let base_expand = if y > 38 { (y - 38) as i32 } else { 0 };
+        let trunk_w = 4 + base_expand;
+        for x in ((cx - trunk_w) as usize)..=((cx + trunk_w) as usize) {
+            if x == (cx - trunk_w) as usize || x == (cx + trunk_w) as usize || y == 45 {
+                sp.pixels[y * w + x] = dark;
+            } else if (x + y) % 3 == 0 {
+                sp.pixels[y * w + x] = light;
+            } else {
+                sp.pixels[y * w + x] = mid;
+            }
+        }
+    }
+
+    // Serpentine root flares
+    for y in 38..46 {
+        sp.pixels[y * w + 11] = dark;
+        sp.pixels[y * w + 12] = mid;
+        sp.pixels[y * w + 26] = mid;
+        sp.pixels[y * w + 27] = dark;
+    }
+
+    // Heavy gnarled canopy & twisted boughs
+    for y in 2..24 {
+        for x in 2..36 {
+            let dx = (x as i32 - 19).abs();
+            let dy = (y as i32 - 13).abs();
+            let d = dx * dx + dy * dy * 2;
+            if d < 180 {
+                let is_edge = d > 145;
+                if is_edge {
+                    sp.pixels[y * w + x] = dark;
+                } else if (x * 7 + y * 13) % 5 == 0 {
+                    sp.pixels[y * w + x] = moss;
+                } else if (x + y) % 3 == 0 {
+                    sp.pixels[y * w + x] = light;
+                } else {
+                    sp.pixels[y * w + x] = mid;
+                }
+            }
+        }
+    }
+
+    // Hanging Spanish moss tendrils
+    for y in 24..32 {
+        sp.pixels[y * w + 8] = moss;
+        sp.pixels[y * w + 14] = moss;
+        sp.pixels[y * w + 24] = moss;
+        sp.pixels[y * w + 30] = moss;
+    }
+
+    sp
+}
+
+fn generate_glowing_mushrooms(frame: usize) -> Sprite {
+    let w = 20;
+    let h = 18;
+    let mut sp = Sprite::new(w, h);
+    let stalk_dark = Color::rgb(35, 42, 48);
+    let stalk_mid = Color::rgb(75, 88, 98);
+    let cap_cyan = Color::rgb(65, 230, 175);
+    let cap_teal = Color::rgb(40, 180, 240);
+    let cap_glow = Color::rgb(140, 255, 220);
+
+    // Stalks
+    for y in 8..18 {
+        // Large center mushroom stalk
+        sp.pixels[y * w + 10] = stalk_dark;
+        sp.pixels[y * w + 11] = stalk_mid;
+
+        // Left small stalk
+        if y >= 11 {
+            sp.pixels[y * w + 5] = stalk_dark;
+            sp.pixels[y * w + 6] = stalk_mid;
+        }
+
+        // Right small stalk
+        if y >= 12 {
+            sp.pixels[y * w + 15] = stalk_dark;
+            sp.pixels[y * w + 16] = stalk_mid;
+        }
+    }
+
+    // Center Large Cap
+    for y in 3..9 {
+        for x in 6..16 {
+            let dx = (x as i32 - 11).abs();
+            let dy = (y as i32 - 6).abs();
+            if dx * dx + dy * dy * 2 <= 22 {
+                sp.pixels[y * w + x] = if (x + y + frame).is_multiple_of(3) { cap_glow } else { cap_cyan };
+            }
+        }
+    }
+
+    // Left Small Cap
+    for y in 7..12 {
+        for x in 3..9 {
+            let dx = (x as i32 - 6).abs();
+            if dx <= 2 && y <= 10 {
+                sp.pixels[y * w + x] = if (x + frame).is_multiple_of(2) { cap_glow } else { cap_teal };
+            }
+        }
+    }
+
+    // Right Small Cap
+    for y in 8..13 {
+        for x in 13..19 {
+            let dx = (x as i32 - 16).abs();
+            if dx <= 2 && y <= 11 {
+                sp.pixels[y * w + x] = if (y + frame).is_multiple_of(2) { cap_glow } else { cap_cyan };
+            }
+        }
+    }
+
+    sp
+}
+
+fn generate_root_briar() -> Sprite {
+    let w = 24;
+    let h = 18;
+    let mut sp = Sprite::new(w, h);
+    let dark = Color::rgb(28, 22, 20);
+    let mid = Color::rgb(55, 42, 34);
+    let light = Color::rgb(82, 64, 50);
+    let thorn = Color::rgb(110, 40, 35);
+
+    // Tangled root loops
+    for y in 4..18 {
+        for x in 2..22 {
+            let pattern = ((x as i32 * 5 - y as i32 * 3).abs() % 7) == 0
+                || ((x as i32 * 3 + y as i32 * 4) % 9) == 0;
+            if pattern && y >= 6 {
+                sp.pixels[y * w + x] = if (x + y) % 3 == 0 { light } else { mid };
+            }
+        }
+    }
+
+    // Outline and base shadow
+    for x in 2..22 {
+        sp.pixels[17 * w + x] = dark;
+    }
+
+    // Sharp thorns
+    for (tx, ty) in [(6, 8), (11, 5), (15, 9), (18, 6)] {
+        sp.pixels[ty * w + tx] = thorn;
+    }
+
+    sp
+}
+
+fn generate_rotten_stump() -> Sprite {
+    let w = 18;
+    let h = 16;
+    let mut sp = Sprite::new(w, h);
+    let dark = Color::rgb(30, 24, 22);
+    let mid = Color::rgb(54, 42, 35);
+    let light = Color::rgb(80, 65, 52);
+    let shroom = Color::rgb(210, 140, 60);
+
+    // Fluted stump trunk
+    for y in 4..16 {
+        for x in 2..16 {
+            let is_edge = x == 2 || x == 15 || y == 15;
+            if is_edge {
+                sp.pixels[y * w + x] = dark;
+            } else if (x + y) % 3 == 0 {
+                sp.pixels[y * w + x] = light;
+            } else {
+                sp.pixels[y * w + x] = mid;
+            }
+        }
+    }
+
+    // Hollow center cavity
+    for y in 4..8 {
+        for x in 6..12 {
+            sp.pixels[y * w + x] = Palette::VOID_BLACK;
+        }
+    }
+
+    // Bracket shelf mushrooms
+    sp.pixels[9 * w + 14] = shroom;
+    sp.pixels[9 * w + 15] = shroom;
+    sp.pixels[12 * w + 3] = shroom;
+
+    sp
+}
+
+fn generate_castle_pillar() -> Sprite {
+    let w = 20;
+    let h = 40;
+    let mut sp = Sprite::new(w, h);
+    let dark = Color::rgb(26, 28, 36);
+    let mid = Color::rgb(52, 56, 70);
+    let light = Color::rgb(88, 95, 118);
+    let gold = Palette::GOLD_TRIM;
+
+    // Base plinth
+    for y in 34..40 {
+        for x in 1..19 {
+            if y == 39 || x == 1 || x == 18 {
+                sp.pixels[y * w + x] = dark;
+            } else if y == 34 {
+                sp.pixels[y * w + x] = light;
+            } else {
+                sp.pixels[y * w + x] = mid;
+            }
+        }
+    }
+
+    // Fluted vertical shaft
+    for y in 8..34 {
+        for x in 3..17 {
+            if x == 3 || x == 16 {
+                sp.pixels[y * w + x] = dark;
+            } else if x % 3 == 0 {
+                sp.pixels[y * w + x] = dark; // fluting shadow line
+            } else if x % 3 == 1 {
+                sp.pixels[y * w + x] = light; // fluting highlight
+            } else {
+                sp.pixels[y * w + x] = mid;
+            }
+        }
+    }
+
+    // Ornate gothic capital at top
+    for y in 0..8 {
+        for x in 1..19 {
+            if y == 0 || y == 7 || x == 1 || x == 18 {
+                sp.pixels[y * w + x] = dark;
+            } else if y == 4 {
+                sp.pixels[y * w + x] = gold;
+            } else {
+                sp.pixels[y * w + x] = light;
+            }
+        }
+    }
+
+    sp
+}
+
+fn generate_gargoyle_statue() -> Sprite {
+    let w = 20;
+    let h = 28;
+    let mut sp = Sprite::new(w, h);
+    let dark = Color::rgb(24, 26, 32);
+    let mid = Color::rgb(55, 60, 72);
+    let light = Color::rgb(90, 98, 116);
+    let eye = Color::rgb(255, 60, 50);
+
+    // Pedestal plinth
+    for y in 22..28 {
+        for x in 3..17 {
+            if y == 27 || x == 3 || x == 16 {
+                sp.pixels[y * w + x] = dark;
+            } else {
+                sp.pixels[y * w + x] = mid;
+            }
+        }
+    }
+
+    // Crouching gargoyle body & talons
+    for y in 10..22 {
+        for x in 6..14 {
+            if x == 6 || x == 13 {
+                sp.pixels[y * w + x] = dark;
+            } else if (x + y) % 2 == 0 {
+                sp.pixels[y * w + x] = light;
+            } else {
+                sp.pixels[y * w + x] = mid;
+            }
+        }
+    }
+
+    // Horned head
+    for y in 4..10 {
+        for x in 7..13 {
+            sp.pixels[y * w + x] = mid;
+        }
+    }
+    // Horns
+    sp.pixels[2 * w + 6] = dark;
+    sp.pixels[3 * w + 7] = light;
+    sp.pixels[2 * w + 13] = dark;
+    sp.pixels[3 * w + 12] = light;
+
+    // Glowing red eye
+    sp.pixels[6 * w + 9] = eye;
+    sp.pixels[6 * w + 11] = eye;
+
+    // Bat wings splayed on sides
+    for y in 6..18 {
+        sp.pixels[y * w + 3] = dark;
+        sp.pixels[y * w + 4] = light;
+        sp.pixels[y * w + 15] = light;
+        sp.pixels[y * w + 16] = dark;
+    }
+
+    sp
+}
+
+fn generate_castle_brazier(frame: usize) -> Sprite {
+    let w = 16;
+    let h = 26;
+    let mut sp = Sprite::new(w, h);
+    let iron_dark = Color::rgb(22, 24, 28);
+    let iron_mid = Palette::IRON_MID;
+    let iron_light = Palette::IRON_LIGHT;
+
+    let flame_core = Palette::BONFIRE_CORE;
+    let flame_violet = Color::rgb(190, 85, 255);
+    let flame_amber = Palette::BONFIRE_ORANGE;
+
+    // Tripod iron legs and base
+    for y in 14..26 {
+        sp.pixels[y * w + 4] = iron_dark;
+        sp.pixels[y * w + 11] = iron_dark;
+        if y >= 20 {
+            sp.pixels[y * w + 2] = iron_dark;
+            sp.pixels[y * w + 13] = iron_dark;
+        }
+    }
+
+    // Iron brazier bowl
+    for y in 10..14 {
+        for x in 2..14 {
+            if y == 13 || x == 2 || x == 13 {
+                sp.pixels[y * w + x] = iron_dark;
+            } else {
+                sp.pixels[y * w + x] = if (x + y) % 2 == 0 { iron_light } else { iron_mid };
+            }
+        }
+    }
+
+    // Roaring violet & amber fire animation across 2 frames
+    for y in (2 + frame % 2)..10 {
+        for x in 4..12 {
+            let dx = (x as i32 - 7).abs();
+            let dy = (y as i32 - 6).abs();
+            if dx + dy < 5 {
+                sp.pixels[y * w + x] = if dx == 0 && dy <= 1 {
+                    flame_core
+                } else if (x + y + frame).is_multiple_of(2) {
+                    flame_violet
+                } else {
+                    flame_amber
+                };
+            }
+        }
+    }
+
+    sp
+}
+
+fn generate_castle_banner(frame: usize) -> Sprite {
+    let w = 14;
+    let h = 34;
+    let mut sp = Sprite::new(w, h);
+    let iron = Palette::IRON_MID;
+    let velvet_dark = Color::rgb(55, 12, 18);
+    let velvet_mid = Color::rgb(115, 22, 32);
+    let gold = Palette::GOLD_TRIM;
+
+    // Iron wall bracket and spearhead finial
+    for x in 1..13 {
+        sp.pixels[2 * w + x] = iron;
+    }
+    sp.pixels[w + 1] = iron;
+    sp.pixels[w + 12] = iron;
+
+    // Hanging crimson velvet banner with subtle sway
+    let sway = if frame % 2 == 1 { 1 } else { 0 };
+    for y in 3..30 {
+        let x_off = if y > 20 { sway } else { 0 };
+        for x in (2 + x_off)..(12 + x_off) {
+            if x == 2 + x_off || x == 11 + x_off {
+                sp.pixels[y * w + x] = gold;
+            } else if (x + y) % 3 == 0 {
+                sp.pixels[y * w + x] = velvet_dark;
+            } else {
+                sp.pixels[y * w + x] = velvet_mid;
+            }
+        }
+    }
+
+    // Gold imperial crown/dragon crest in center
+    for y in 10..16 {
+        for x in (5 + sway)..(9 + sway) {
+            sp.pixels[y * w + x] = gold;
+        }
+    }
+
+    // Tattered scalloped bottom tails
+    for (tx, ty) in [(3 + sway, 31), (4 + sway, 32), (7 + sway, 31), (9 + sway, 32), (10 + sway, 31)] {
+        sp.pixels[ty * w + tx] = velvet_mid;
+    }
+
+    sp
+}
+
+fn generate_fog_wall_gate() -> Sprite {
+    let w = 38;
+    let h = 36;
+    let mut sp = Sprite::new(w, h);
+    let dark = Palette::STONE_COOL_DARK;
+    let mid = Palette::CAVEA_STONE_MID;
+    let light = Palette::STONE_COOL_LIGHT;
+
+    // Left fluted gothic pillar (width 5)
+    for y in 0..36 {
+        for x in 0..5 {
+            if x == 0 || x == 4 || y == 35 {
+                sp.pixels[y * w + x] = dark;
+            } else if x == 2 {
+                sp.pixels[y * w + x] = light;
+            } else {
+                sp.pixels[y * w + x] = mid;
+            }
+        }
+    }
+
+    // Right fluted gothic pillar (width 5)
+    for y in 0..36 {
+        for x in 33..38 {
+            if x == 33 || x == 37 || y == 35 {
+                sp.pixels[y * w + x] = dark;
+            } else if x == 35 {
+                sp.pixels[y * w + x] = light;
+            } else {
+                sp.pixels[y * w + x] = mid;
+            }
+        }
+    }
+
+    // Overhead pointed gothic lintel arch connecting pillars
+    for x in 4..34 {
+        let dist_from_center = (x as i32 - 19).abs();
+        let arch_y = (dist_from_center * 8) / 15;
+        for y in (arch_y as usize)..=(arch_y as usize + 5).min(35) {
+            if y == arch_y as usize || y == arch_y as usize + 5 {
+                sp.pixels[y * w + x] = dark;
+            } else {
+                sp.pixels[y * w + x] = if (x + y) % 2 == 0 { light } else { mid };
+            }
+        }
+    }
 
     sp
 }
