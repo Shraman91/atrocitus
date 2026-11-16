@@ -238,6 +238,7 @@ mod tests {
             // 9. MapScene
             let map_grid = MapGrid::new(280, 190);
             let mut map = map::MapScene::new(
+                "TEST AREA - MAP".to_string(),
                 map_grid,
                 (140.0, 95.0),
                 0.0,
@@ -298,8 +299,22 @@ mod tests {
                 assert_eq!(bank.body_rmb[d][f].width, 18);
                 assert_eq!(bank.body_rmb[d][f].height, 30);
             }
+            assert_eq!(bank.body_block[d].width, 18);
+            assert_eq!(bank.body_block[d].height, 30);
             assert_eq!(bank.body_hit[d].width, 18);
             assert_eq!(bank.body_hit[d].height, 30);
+
+            // Verify class gear block stance dimensions
+            assert_eq!(bank.knight_gear.block_frame[d].width, 18);
+            assert_eq!(bank.knight_gear.block_frame[d].height, 30);
+            assert_eq!(bank.mage_gear.block_frame[d].width, 18);
+            assert_eq!(bank.mage_gear.block_frame[d].height, 30);
+            assert_eq!(bank.assassin_gear.block_frame[d].width, 18);
+            assert_eq!(bank.assassin_gear.block_frame[d].height, 30);
+            assert_eq!(bank.hunter_gear.block_frame[d].width, 18);
+            assert_eq!(bank.hunter_gear.block_frame[d].height, 30);
+            assert_eq!(bank.alchemist_gear.block_frame[d].width, 18);
+            assert_eq!(bank.alchemist_gear.block_frame[d].height, 30);
         }
         assert_eq!(bank.body_death.width, 18);
         assert_eq!(bank.body_death.height, 30);
@@ -467,6 +482,8 @@ mod tests {
         assert_eq!(chapel_fog.target_part, ForestPartId::AutumnWoods);
         assert!(chapel.enemy_spawns.iter().any(|e| matches!(e.kind, EnemyKind::Worm)), "Chapel must have Corpse Worms");
         assert!(chapel.enemy_spawns.iter().any(|e| matches!(e.kind, EnemyKind::Fly)), "Chapel must have Carrion Flies");
+        assert!(chapel.width >= 400 && chapel.height >= 300, "Chapel must be expanded and vast");
+        assert_eq!(chapel.ground_items.len(), 5, "Chapel must contain 5 scattered ground items");
 
         // Verify part 2: Autumn Woods
         let woods = config.get_part(ForestPartId::AutumnWoods).expect("Autumn Woods part missing");
@@ -477,6 +494,8 @@ mod tests {
         assert_eq!(woods_fog.target_part, ForestPartId::DeepForest);
         assert!(woods.enemy_spawns.iter().any(|e| matches!(e.kind, EnemyKind::Sludge)), "Autumn Woods must have Acid Sludges");
         assert!(woods.enemy_spawns.iter().any(|e| matches!(e.kind, EnemyKind::Skeleton)), "Autumn Woods must have Bogged Skeletons");
+        assert!(woods.width >= 400 && woods.height >= 300, "Autumn Woods must be expanded and vast");
+        assert_eq!(woods.ground_items.len(), 5, "Autumn Woods must contain 5 scattered ground items");
 
         // Verify part 3: Gloomwood Deep
         let deep = config.get_part(ForestPartId::DeepForest).expect("Deep Forest part missing");
@@ -489,11 +508,15 @@ mod tests {
         assert!(deep.enemy_spawns.iter().any(|e| matches!(e.kind, EnemyKind::Fly)));
         assert!(deep.enemy_spawns.iter().any(|e| matches!(e.kind, EnemyKind::Sludge)));
         assert!(deep.enemy_spawns.iter().any(|e| matches!(e.kind, EnemyKind::Skeleton)));
+        assert!(deep.width >= 400 && deep.height >= 300, "Deep Forest must be expanded and vast");
+        assert_eq!(deep.ground_items.len(), 5, "Deep Forest must contain 5 scattered ground items");
 
         // Verify part 4: Dread Keep (Boss Area)
         let castle = config.get_part(ForestPartId::CastleKeep).expect("Castle Keep part missing");
         assert_eq!(castle.name, "The Dread Keep");
         assert!(castle.return_fog_wall.is_some(), "Castle Keep must have return fog wall to Deep Forest");
+        assert!(castle.width >= 400 && castle.height >= 300, "Castle Keep must be expanded and vast");
+        assert_eq!(castle.ground_items.len(), 5, "Castle Keep must contain 5 scattered ground items");
 
         // 2. Build world terrain for all 4 parts
         for part in &config.parts {

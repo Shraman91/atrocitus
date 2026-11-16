@@ -147,9 +147,31 @@ Tracking document for all phases of development. Updated after every phase to pr
   - [x] All class movesets (Knight 3-hit combo & block, Mage Bolt/Nova/Corpse siphon, Assassin flurry/shadowstep, Hunter twin blade/flintlock, Alchemist vial/eye) fully functional and dealing damage against all mobs.
   - [x] Souls accumulation and bloodstain dropping/retrieval on death.
   - [x] Map (`M`) tracking world coordinates across all 4 parts.
+- [x] **Vast Explorable Areas & Non-Clumping Enemy Squads**
+  - [x] Expanded world dimensions across all 4 parts (Chapel: 440x320, Autumn Woods: 480x340, Gloomwood Deep: 520x380, Dread Keep: 480x340).
+  - [x] Rich sub-regions, branching side paths, secluded clearings, ruins, and natural choke points.
+  - [x] Enemy tether and aggro radius system (`EnemyState::Idle` with home-position tether, distinct detection radiuses: Skeletons 115px, Flies 95px, Sludges/Worms 75px, and distance-based de-aggro). Prevents all mobs from clumping together!
+  - [x] Scattered solo wanderers, perimeter sentinels, and tactical grouped squads (ambush packs, cemetery worm nests, caravan raiders, mire squads).
+- [x] **Ground Item Pickups & Souls Looting System**
+  - [x] 20 unique items scattered across all 4 areas (5 per area) in secret alcoves, behind enemy squads, and at landmarks.
+  - [x] Shimmering souls-like ground beacons with pulsing colored halos, emissive star cores, and dynamic point light illumination.
+  - [x] Interactive looting prompt: `[Click / E] Loot: <Item Name> (x<Count>)`.
+  - [x] On pickup: adds to player's 20-slot inventory, displays floating text in item rarity color, bursts glowing spark particles, and shakes screen.
+  - [x] Items include healing tears, weapon upgrade materials (Titanite Chunks, Amber), throwing firebombs, key armory keys, curing salves, and soul vessels.
+- [x] **Expanded Fullscreen Map (`M`) & Exploration Telemetry**
+  - [x] Grand responsive map layout dynamically adapting to 120x40, 160x50, 200x60 (up to 180 cols and 56 rows).
+  - [x] Exploration percentage calculation and visual progress bar (`[████████░░░░] 64%`).
+  - [x] Rectangular gothic perimeter walls with gate passage gaps for Forest parts; oval perimeter for Ashen Colosseum.
+  - [x] Player directional position arrow (`▶`, `▼`, `▲`, `◢`, `◣`), bonfire beacon (`🔥`), fog walls (`🌫`), passage gates (`░`), and NPC markers.
+- [x] **Improved Character Attack, Shield & Walking Animations**
+  - [x] Dynamic walking animations: boot lifting off ground (`l_boot_y`, `r_boot_y` vertical displacements), leg forward/back stride swing, arm counter-swings, and head/torso bobbing across a 6-frame cycle.
+  - [x] Expressive attack animations: windup telegraphs, forward lunges, greatsword cleave trails, and dynamic weapon crescent blade trails rendered on `Framebuffer`.
+  - [x] Dedicated shield blocking stances: Knight raised heater shield with braced knees, Mage warding staff, Assassin twin-dagger X-guard, Hunter parry, and Alchemist buckler stance.
+  - [x] Radiant frontal shield barrier arc facing aim direction on `Framebuffer` with 80% damage reduction, deflection sparks, and "BLOCKED!" feedback.
 - [x] **Verification & Tests**
   - [x] Dedicated unit/integration test `test_area1_forest_four_parts_and_fog_walls` verifying all 4 parts, props, enemy tables, terrain generation, and multi-resolution rendering.
-  - [x] All 25 tests pass. Zero clippy warnings (`cargo clippy --all-targets -- -D warnings`).
+  - [x] Dedicated unit test `test_blocking_and_attack_visual_rendering` testing shield barrier, weapon trails, and 6-frame walk cycle.
+  - [x] All 26 tests pass. Zero clippy warnings (`cargo clippy --all-targets -- -D warnings`).
   - [x] Release build compiled successfully (`cargo build --release`).
 
 ---

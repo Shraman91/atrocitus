@@ -1,7 +1,7 @@
 use crate::assets::palette::Palette;
 use crate::engine::color::Color;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ItemRarity {
     Common,
     Uncommon,
@@ -20,13 +20,58 @@ impl ItemRarity {
     }
 }
 
+fn default_item_category() -> String {
+    "Consumable".to_string()
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GroundItemConfig {
+    pub x: f32,
+    pub y: f32,
+    pub name: String,
+    pub count: u32,
+    pub rarity: ItemRarity,
+    pub description: String,
+    #[serde(default = "default_item_category")]
+    pub category: String,
+}
+
 #[derive(Debug, Clone)]
+pub struct GroundItem {
+    pub id: usize,
+    pub x: f32,
+    pub y: f32,
+    pub item: Item,
+    pub collected: bool,
+    pub pulse_timer: f32,
+}
+
+impl GroundItem {
+    pub fn new(id: usize, cfg: &GroundItemConfig) -> Self {
+        Self {
+            id,
+            x: cfg.x,
+            y: cfg.y,
+            item: Item {
+                name: cfg.name.clone(),
+                count: cfg.count,
+                rarity: cfg.rarity,
+                description: cfg.description.clone(),
+                category: cfg.category.clone(),
+            },
+            collected: false,
+            pulse_timer: (id as f32) * 0.73,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Item {
     pub name: String,
     pub count: u32,
     pub rarity: ItemRarity,
     pub description: String,
-    pub category: &'static str,
+    pub category: String,
 }
 
 #[derive(Debug, Clone)]
@@ -52,7 +97,7 @@ impl Inventory {
             count: 3,
             rarity: ItemRarity::Rare,
             description: "Restores weary flesh and kindles the inner ember.".to_string(),
-            category: "Consumable",
+            category: "Consumable".to_string(),
         });
 
         inv.add_item(Item {
@@ -60,7 +105,7 @@ impl Inventory {
             count: 1,
             rarity: ItemRarity::Uncommon,
             description: "Parchment tracking the ruined colosseum boundaries.".to_string(),
-            category: "Key Item",
+            category: "Key Item".to_string(),
         });
 
         inv.add_item(Item {
@@ -68,7 +113,7 @@ impl Inventory {
             count: 2,
             rarity: ItemRarity::Common,
             description: "Hardened mineral used to reinforce basic armaments.".to_string(),
-            category: "Material",
+            category: "Material".to_string(),
         });
 
         inv
@@ -101,7 +146,7 @@ impl Inventory {
             count: 5,
             rarity: ItemRarity::Common,
             description: "Earthen pot filled with volatile pitch. Explodes in flames.".to_string(),
-            category: "Consumable",
+            category: "Consumable".to_string(),
         });
 
         self.add_item(Item {
@@ -109,7 +154,7 @@ impl Inventory {
             count: 1,
             rarity: ItemRarity::Uncommon,
             description: "White fragment that returns the carrier to the last bonfire rested at.".to_string(),
-            category: "Consumable",
+            category: "Consumable".to_string(),
         });
 
         self.add_item(Item {
@@ -117,7 +162,7 @@ impl Inventory {
             count: 3,
             rarity: ItemRarity::Mythic,
             description: "Condensed primordial cinder from ancient champion pyres.".to_string(),
-            category: "Material",
+            category: "Material".to_string(),
         });
     }
 }

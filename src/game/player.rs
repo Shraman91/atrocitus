@@ -988,6 +988,8 @@ impl Player {
             &bank.body_roll[dir_idx][self.anim_frame % 7]
         } else if self.flinch_timer > 0.0 {
             &bank.body_hit[dir_idx]
+        } else if self.is_blocking {
+            &bank.body_block[dir_idx]
         } else if self.is_attacking {
             let f = ((1.0 - (self.attack_timer / self.attack_duration).clamp(0.0, 1.0)) * 4.0) as usize % 4;
             &bank.body_lmb[dir_idx][f]
@@ -1006,6 +1008,46 @@ impl Player {
             return;
         }
 
+        // Dedicated Blocking Stance & Frontal Defensive Barrier Arc
+        if self.is_blocking {
+            if let Some(gear_set) = self.equipped_class.and_then(|class| bank.get_class_gear(class)) {
+                gear_set.block_frame[dir_idx].draw(fb, draw_x, draw_y, self.flip_x);
+            } else {
+                bank.body_block[dir_idx].draw(fb, draw_x, draw_y, self.flip_x);
+            }
+
+            // Draw Frontal Shield Barrier Arc in facing aim direction
+            let shield_cx = self.x - cam_x as f32;
+            let shield_cy = (self.y - 12.0) - cam_y as f32;
+            let r = 16.0;
+
+            for step in -3i32..=3i32 {
+                let ang = self.facing_angle + (step as f32 * 0.22);
+                let px = (shield_cx + ang.cos() * r).round() as i32;
+                let py = (shield_cy + ang.sin() * r).round() as i32;
+
+                let (core_col, rim_col) = match self.equipped_class {
+                    Some(ClassKind::Knight) => (
+                        Color::rgba(255, 235, 140, 230),
+                        Color::rgba(255, 180, 40, 160),
+                    ),
+                    Some(ClassKind::Mage) => (
+                        Color::rgba(190, 240, 255, 230),
+                        Color::rgba(80, 200, 255, 160),
+                    ),
+                    _ => (
+                        Color::rgba(240, 245, 255, 210),
+                        Color::rgba(140, 160, 190, 140),
+                    ),
+                };
+
+                fb.set_pixel_blend(px, py, core_col);
+                fb.set_pixel_blend(px + 1, py, rim_col);
+                fb.set_pixel_blend(px, py + 1, rim_col);
+            }
+            return;
+        }
+
         // Layered gear composite rendering
         if let Some(gear_set) = self.equipped_class.and_then(|class| bank.get_class_gear(class)) {
             if self.flinch_timer > 0.0 {
@@ -1015,6 +1057,42 @@ impl Player {
             if self.is_attacking {
                 let f = ((1.0 - (self.attack_timer / self.attack_duration).clamp(0.0, 1.0)) * 4.0) as usize % 4;
                 gear_set.lmb_frames[dir_idx][f].draw(fb, draw_x, draw_y, self.flip_x);
+
+                // Render dynamic weapon slash crescent trail overlay
+                let progress = 1.0 - (self.attack_timer / self.attack_duration).clamp(0.0, 1.0);
+                if (0.15..=0.70).contains(&progress) {
+                    let slash_cx = self.x - cam_x as f32;
+                    let slash_cy = (self.y - 12.0) - cam_y as f32;
+                    let r = 18.0;
+
+                    let sweep_center = self.facing_angle + (progress - 0.4) * 1.5;
+                    for step in -4i32..=4i32 {
+                        let ang = sweep_center + (step as f32 * 0.18);
+                        let r_offset = (4 - step.abs()) as f32 * 0.8;
+                        let px = (slash_cx + ang.cos() * (r + r_offset)).round() as i32;
+                        let py = (slash_cy + ang.sin() * (r + r_offset)).round() as i32;
+
+                        let (slash_col, glint_col) = match self.equipped_class {
+                            Some(ClassKind::Knight) => (
+                                Color::rgba(250, 252, 255, 240),
+                                Color::rgba(255, 215, 80, 200),
+                            ),
+                            Some(ClassKind::Mage) => (
+                                Color::rgba(180, 240, 255, 230),
+                                Color::rgba(100, 210, 255, 180),
+                            ),
+                            _ => (
+                                Color::rgba(245, 248, 255, 220),
+                                Color::rgba(160, 190, 230, 160),
+                            ),
+                        };
+
+                        fb.set_pixel_blend(px, py, slash_col);
+                        if step.abs() <= 2 {
+                            fb.set_pixel_blend(px + 1, py, glint_col);
+                        }
+                    }
+                }
                 return;
             }
 
@@ -1049,6 +1127,29 @@ impl Player {
             self.dir4,
             self.flip_x,
         );
+
+        // Draw weapon slash trail for Wanderer if attacking
+        if self.is_attacking {
+            let progress = 1.0 - (self.attack_timer / self.attack_duration).clamp(0.0, 1.0);
+            if (0.15..=0.70).contains(&progress) {
+                let slash_cx = self.x - cam_x as f32;
+                let slash_cy = (self.y - 12.0) - cam_y as f32;
+                let r = 18.0;
+
+                let sweep_center = self.facing_angle + (progress - 0.4) * 1.5;
+                for step in -4i32..=4i32 {
+                    let ang = sweep_center + (step as f32 * 0.18);
+                    let r_offset = (4 - step.abs()) as f32 * 0.8;
+                    let px = (slash_cx + ang.cos() * (r + r_offset)).round() as i32;
+                    let py = (slash_cy + ang.sin() * (r + r_offset)).round() as i32;
+
+                    fb.set_pixel_blend(px, py, Color::rgba(245, 248, 255, 220));
+                    if step.abs() <= 2 {
+                        fb.set_pixel_blend(px + 1, py, Color::rgba(160, 190, 230, 160));
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1179,5 +1280,32 @@ mod tests {
         assert_eq!(player.mana, player.max_mana);
         assert_eq!(player.x, 140.0);
         assert_eq!(player.y, 111.0);
+    }
+
+    #[test]
+    fn test_blocking_and_attack_visual_rendering() {
+        let bank = SpriteBank::build();
+        let mut fb = Framebuffer::new(80, 60);
+
+        let mut player = Player::new(40.0, 30.0);
+        player.set_class(Some(ClassKind::Knight));
+
+        // 1. Test shield block stance rendering
+        player.is_blocking = true;
+        player.draw(&mut fb, &bank, 0, 0);
+
+        // 2. Test attack slash crescent trail rendering
+        player.is_blocking = false;
+        player.is_attacking = true;
+        player.attack_timer = player.attack_duration * 0.5; // mid-swing
+        player.draw(&mut fb, &bank, 0, 0);
+
+        // 3. Test walk cycle stride rendering across 6 frames
+        player.is_attacking = false;
+        player.is_moving = true;
+        for f in 0..6 {
+            player.anim_frame = f;
+            player.draw(&mut fb, &bank, 0, 0);
+        }
     }
 }

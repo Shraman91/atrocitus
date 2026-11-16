@@ -245,6 +245,8 @@ pub struct ForestPartConfig {
     pub torches: Vec<TorchConfig>,
     pub props: Vec<PropConfig>,
     pub enemy_spawns: Vec<EnemySpawnConfig>,
+    #[serde(default)]
+    pub ground_items: Vec<crate::game::inventory::GroundItemConfig>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -306,6 +308,7 @@ impl ForestAreaConfig {
                     ],
                     props: vec![],
                     enemy_spawns: vec![],
+                    ground_items: vec![],
                 },
             ],
         }
@@ -604,13 +607,16 @@ impl World {
         match part_cfg.id {
             ForestPartId::Chapel => {
                 // Desecrated Chapel: Ruined gothic stone floor, nave flagstones, blood pools near corpses, mossy graveyard perimeter
+                let nave_half_w = (eff_w as f32 * 0.28).max(50.0);
+                let nave_half_h = (eff_h as f32 * 0.42).max(60.0);
                 for y in 0..eff_h {
                     let row = y * eff_w;
                     for x in 0..eff_w {
                         let dx = (x as f32 - cx).abs();
                         let dy = (y as f32 - cy).abs();
+                        let in_bounds = x >= 14 && x < eff_w - 14 && y >= 14 && y < eff_h - 14;
 
-                        let col = if dx < 75.0 && dy < 72.0 {
+                        let col = if in_bounds && dx < nave_half_w && dy < nave_half_h {
                             let flagstone = (x / 12 + y / 8) % 4 == 0 && (x % 12 > 1 && y % 8 > 1);
                             let crack = ((x * 17 + y * 31) % 67) == 0;
                             if crack {
@@ -626,7 +632,7 @@ impl World {
                             } else {
                                 Palette::STONE_COOL_DARK
                             }
-                        } else if dx < 95.0 && dy < 85.0 {
+                        } else if in_bounds {
                             // Overgrown churchyard grounds with moss and dirt
                             let moss = ((x * 19 + y * 23) % 19) == 0;
                             if moss {
@@ -646,7 +652,7 @@ impl World {
                 }
 
                 // Desecrated nave central aisle
-                for y in 35..155 {
+                for y in 24..(eff_h.saturating_sub(24)) {
                     let row = y * eff_w;
                     for x in (cx as usize - 9)..=(cx as usize + 9) {
                         let dist = (x as i32 - cx as i32).abs();
@@ -668,10 +674,9 @@ impl World {
                 for y in 0..eff_h {
                     let row = y * eff_w;
                     for x in 0..eff_w {
-                        let dx = (x as f32 - cx).abs();
-                        let dy = (y as f32 - cy).abs();
+                        let in_bounds = x >= 14 && x < eff_w - 14 && y >= 14 && y < eff_h - 14;
 
-                        let col = if dx < 105.0 && dy < 82.0 {
+                        let col = if in_bounds {
                             let leaf_noise = ((x * 23 + y * 41) ^ ((x >> 2) + (y >> 2))) % 97;
                             if leaf_noise < 20 {
                                 Color::rgb(225, 135, 42) // golden amber
@@ -693,12 +698,12 @@ impl World {
                 }
 
                 // Winding forest trail through glade
-                for y in 25..170 {
-                    let trail_cx = (cx + ((y as f32 * 0.08).sin() * 14.0)).round() as usize;
+                for y in 24..(eff_h.saturating_sub(24)) {
+                    let trail_cx = (cx + ((y as f32 * 0.05).sin() * (eff_w as f32 * 0.12))).round() as usize;
                     let row = y * eff_w;
-                    for x in trail_cx.saturating_sub(7)..=(trail_cx + 7).min(eff_w - 1) {
+                    for x in trail_cx.saturating_sub(8)..=(trail_cx + 8).min(eff_w - 1) {
                         let dist = (x as i32 - trail_cx as i32).abs();
-                        ground_pixels[row + x] = if dist >= 6 {
+                        ground_pixels[row + x] = if dist >= 7 {
                             Color::rgb(140, 60, 25)
                         } else if (x + y) % 2 == 0 {
                             Palette::ARENA_SAND_LIGHT
@@ -711,20 +716,27 @@ impl World {
 
             ForestPartId::DeepForest => {
                 // Gloomwood Deep: dark teal-black peat bog, murky stagnant water pools, glowing lichen
+                let puddle1_x = (eff_w as f32 * 0.32) as i32;
+                let puddle1_y = (eff_h as f32 * 0.65) as i32;
+                let puddle2_x = (eff_w as f32 * 0.68) as i32;
+                let puddle2_y = (eff_h as f32 * 0.40) as i32;
+                let puddle3_x = (eff_w as f32 * 0.50) as i32;
+                let puddle3_y = (eff_h as f32 * 0.78) as i32;
+
                 for y in 0..eff_h {
                     let row = y * eff_w;
                     for x in 0..eff_w {
-                        let dx = (x as f32 - cx).abs();
-                        let dy = (y as f32 - cy).abs();
+                        let in_bounds = x >= 14 && x < eff_w - 14 && y >= 14 && y < eff_h - 14;
 
-                        let col = if dx < 118.0 && dy < 88.0 {
+                        let col = if in_bounds {
                             let peat_noise = ((x * 37 + y * 47) ^ (x >> 1)) % 89;
                             let root = ((x * 11 + y * 7) % 31) == 0;
                             let lichen = ((x * 13 + y * 29) % 43) == 0;
 
                             // Murky swamp puddles
-                            let in_puddle = ((x as i32 - 110).pow(2) + (y as i32 - 130).pow(2) * 2) < 45
-                                || ((x as i32 - 175).pow(2) + (y as i32 - 95).pow(2) * 2) < 40;
+                            let in_puddle = ((x as i32 - puddle1_x).pow(2) + (y as i32 - puddle1_y).pow(2) * 2) < 95
+                                || ((x as i32 - puddle2_x).pow(2) + (y as i32 - puddle2_y).pow(2) * 2) < 85
+                                || ((x as i32 - puddle3_x).pow(2) + (y as i32 - puddle3_y).pow(2) * 2) < 65;
 
                             if in_puddle {
                                 if (x + y) % 3 == 0 {
@@ -757,10 +769,9 @@ impl World {
                 for y in 0..eff_h {
                     let row = y * eff_w;
                     for x in 0..eff_w {
-                        let dx = (x as f32 - cx).abs();
-                        let dy = (y as f32 - cy).abs();
+                        let in_bounds = x >= 14 && x < eff_w - 14 && y >= 14 && y < eff_h - 14;
 
-                        let col = if dx < 105.0 && dy < 82.0 {
+                        let col = if in_bounds {
                             let diamond = (x / 8 + y / 8) % 2 == 0;
                             let flag = x % 16 > 1 && y % 12 > 1;
                             if flag && diamond {

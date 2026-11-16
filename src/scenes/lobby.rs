@@ -249,6 +249,7 @@ impl Scene for LobbyScene {
         );
         if input.just_pressed(VirtualKey::M) {
             return SceneTransition::Push(Box::new(MapScene::new(
+                "THE ASHEN COLOSSEUM - MAP".to_string(),
                 self.map_grid.clone(),
                 (self.player.x, self.player.y),
                 self.player.facing_angle,

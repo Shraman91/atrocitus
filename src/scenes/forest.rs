@@ -18,7 +18,7 @@ use crate::game::combat::{
     SpatialHash, StatusEffectKind,
 };
 use crate::game::enemy::{Enemy, EnemyKind, EnemyState};
-use crate::game::inventory::Inventory;
+use crate::game::inventory::{GroundItem, Inventory};
 use crate::game::map::MapGrid;
 use crate::game::particles::ParticleSystem;
 use crate::game::player::Player;
@@ -74,6 +74,9 @@ pub struct ForestScene {
     traversal_spawn: (f32, f32),
     traversal_prompt_timer: f32,
     traversal_prompt_text: String,
+
+    // Ground Item Pickups
+    ground_items: Vec<GroundItem>,
 }
 
 impl ForestScene {
@@ -110,6 +113,12 @@ impl ForestScene {
         let mut enemies = Vec::with_capacity(part_cfg.enemy_spawns.len() + 8);
         for (i, sp) in part_cfg.enemy_spawns.iter().enumerate() {
             enemies.push(Enemy::new(i + 1, sp.kind, sp.x, sp.y, &combat_data));
+        }
+
+        // Spawn ground items for starting part
+        let mut ground_items = Vec::with_capacity(part_cfg.ground_items.len());
+        for (i, it) in part_cfg.ground_items.iter().enumerate() {
+            ground_items.push(GroundItem::new(i + 1, it));
         }
 
         Self {
@@ -152,6 +161,8 @@ impl ForestScene {
             traversal_spawn: (0.0, 0.0),
             traversal_prompt_timer: 0.0,
             traversal_prompt_text: String::new(),
+
+            ground_items,
         }
     }
 
@@ -238,7 +249,12 @@ impl ForestScene {
                 &self.combat_data,
             ));
         }
-        self.next_enemy_id += part_cfg.enemy_spawns.len() + 10;
+
+        self.ground_items.clear();
+        for (i, it) in part_cfg.ground_items.iter().enumerate() {
+            self.ground_items.push(GroundItem::new(self.next_enemy_id + 100 + i, it));
+        }
+        self.next_enemy_id += part_cfg.enemy_spawns.len() + part_cfg.ground_items.len() + 20;
 
         self.area_banner_timer = 5.0;
     }
@@ -319,6 +335,7 @@ impl Scene for ForestScene {
             let fog_pos = part_cfg.fog_wall.as_ref().map(|f| (f.x, f.y)).unwrap_or((0.0, 0.0));
 
             return SceneTransition::Push(Box::new(MapScene::new(
+                format!("{} - MAP", part_cfg.name.to_uppercase()),
                 self.map_grid.clone(),
                 (self.player.x, self.player.y),
                 self.player.facing_angle,
@@ -767,6 +784,41 @@ impl Scene for ForestScene {
         let clicked = input.mouse_left_just_pressed;
         let pressed_e = input.just_pressed(VirtualKey::E);
 
+        // Ground Item Pickups
+        let p_pos = (self.player.x, self.player.y);
+        for item in &mut self.ground_items {
+            if item.collected {
+                continue;
+            }
+            item.pulse_timer += dt * 3.5;
+            let dx = p_pos.0 - item.x;
+            let dy = p_pos.1 - item.y;
+            let dist_sq = dx * dx + dy * dy;
+
+            if dist_sq < 24.0 * 24.0 {
+                let mouse_hover = (mx - item.x).abs() < 16.0 && (my - item.y).abs() < 16.0;
+                self.traversal_prompt_timer = 0.2;
+                self.traversal_prompt_text = format!("[Click / E] Loot: {} (x{})", item.item.name, item.item.count);
+
+                if pressed_e || (clicked && mouse_hover) {
+                    item.collected = true;
+                    self.inventory.add_item(item.item.clone());
+                    self.floating_texts.push(FloatingText::new(
+                        item.x,
+                        item.y - 18.0,
+                        format!("+{} {}", item.item.count, item.item.name),
+                        item.item.rarity.color(),
+                        1.8,
+                    ));
+                    self.player.screen_shake.add(0.12);
+                    for _ in 0..12 {
+                        self.particles.spawn_spark(item.x, item.y - 4.0, 0.0, -18.0);
+                    }
+                    break;
+                }
+            }
+        }
+
         // Northern Fog Wall (advance to next part)
         if let Some(fog) = &part_cfg.fog_wall {
             let dx = (self.player.x - fog.x).abs();
@@ -907,6 +959,35 @@ impl Scene for ForestScene {
             puddle.draw(fb, cam_x, cam_y, self.time);
         }
 
+        // 4b. Draw Ground Item Pickups (glowing soul orbs)
+        for item in &self.ground_items {
+            if item.collected {
+                continue;
+            }
+            let sx = (item.x - self.camera.x).round() as i32;
+            let sy = (item.y - self.camera.y).round() as i32;
+
+            if sx < -10 || sx > fb.width as i32 + 10 || sy < -10 || sy > fb.height as i32 + 10 {
+                continue;
+            }
+
+            // Contact shadow
+            fb.draw_ellipse(sx, sy + 2, 4, 2, Color::rgba(0, 0, 0, 120));
+
+            // Pulsing ethereal halo
+            let pulse = (item.pulse_timer * 3.5).sin() * 0.3 + 0.7;
+            let col = item.item.rarity.color();
+            let alpha = (36.0 * pulse) as u8;
+            fb.draw_circle(sx, sy, 6, Color::rgba(col.r, col.g, col.b, alpha), false);
+
+            // Shimmering star core (emissive so it shines brightly through darkness)
+            fb.set_pixel(sx, sy, Color::WHITE);
+            fb.set_pixel(sx - 1, sy, col);
+            fb.set_pixel(sx + 1, sy, col);
+            fb.set_pixel(sx, sy - 1, col);
+            fb.set_pixel(sx, sy + 1, col);
+        }
+
         // 5. Y-Sorted Render Entities (Corpses, Props, Enemies, Player)
         enum RenderItem<'a> {
             Prop(&'a crate::game::world::PropInstance),
@@ -972,6 +1053,18 @@ impl Scene for ForestScene {
             flicker_amount: 0.03,
         });
         all_lights.extend_from_slice(&self.world.torch_lights);
+        for item in &self.ground_items {
+            if !item.collected {
+                all_lights.push(crate::engine::lighting::PointLight {
+                    x: item.x,
+                    y: item.y,
+                    radius: 22.0,
+                    intensity: 0.70,
+                    color: item.item.rarity.color(),
+                    flicker_amount: 0.04,
+                });
+            }
+        }
 
         let mut shadow_casters = self.world.get_shadow_casters();
         shadow_casters.push(self.player.get_shadow_caster());

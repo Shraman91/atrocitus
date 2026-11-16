@@ -52,6 +52,8 @@ pub struct Enemy {
     pub kind: EnemyKind,
     pub x: f32,
     pub y: f32,
+    pub home_x: f32,
+    pub home_y: f32,
     pub z: f32, // Height for aerial/flying enemies
     pub vx: f32,
     pub vy: f32,
@@ -115,6 +117,8 @@ impl Enemy {
             kind,
             x,
             y,
+            home_x: x,
+            home_y: y,
             z: initial_z,
             vx: 0.0,
             vy: 0.0,
@@ -122,7 +126,7 @@ impl Enemy {
             hp,
             max_hp: hp,
             souls,
-            state: EnemyState::Chase,
+            state: EnemyState::Idle { timer: 0.8 + ((id % 4) as f32) * 0.4 },
             band: kind.default_band(),
             hit_stop: 0,
             flinch_timer: 0.0,
@@ -342,13 +346,45 @@ impl Enemy {
             }
             EnemyState::Idle { mut timer } => {
                 timer -= dt;
-                if timer <= 0.0 || dist < 140.0 {
+                self.anim_timer += dt * 2.0;
+
+                let aggro_dist = match self.kind {
+                    EnemyKind::Skeleton => 115.0,
+                    EnemyKind::Fly => 95.0,
+                    _ => 75.0,
+                };
+
+                if dist < aggro_dist {
                     self.state = EnemyState::Chase;
                 } else {
+                    // Gentle tether to spawn home position so enemies don't wander off or clump
+                    let h_dx = self.home_x - self.x;
+                    let h_dy = self.home_y - self.y;
+                    let h_dist = (h_dx * h_dx + h_dy * h_dy).sqrt();
+                    if h_dist > 18.0 {
+                        self.vx = (h_dx / h_dist) * (self.move_speed * 0.35);
+                        self.vy = (h_dy / h_dist) * (self.move_speed * 0.35);
+                        self.x += self.vx * dt;
+                        self.y += self.vy * dt;
+                    } else {
+                        self.vx *= 0.8;
+                        self.vy *= 0.8;
+                    }
+
+                    if timer <= 0.0 {
+                        timer = 2.0 + ((self.id % 3) as f32) * 0.8;
+                    }
                     self.state = EnemyState::Idle { timer };
                 }
             }
             EnemyState::Chase => {
+                // Drop aggro if player retreats far away
+                if dist > 210.0 {
+                    self.state = EnemyState::Idle { timer: 2.5 };
+                    self.vx *= 0.5;
+                    self.vy *= 0.5;
+                    return;
+                }
                 self.anim_timer += dt * 6.0;
                 let cur_speed = self.move_speed * speed_mult;
 

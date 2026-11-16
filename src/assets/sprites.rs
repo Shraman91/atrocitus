@@ -216,6 +216,7 @@ pub struct ClassGearSet {
     pub accessory: [Option<Sprite>; 4],
     pub lmb_frames: [[Sprite; 4]; 4],
     pub rmb_frames: [[Sprite; 4]; 4],
+    pub block_frame: [Sprite; 4],
     pub hit_frame: [Sprite; 4],
     pub death_frame: Sprite,
 }
@@ -227,6 +228,7 @@ pub struct SpriteBank {
     pub body_roll: [[Sprite; 7]; 4],  // 4 directions x 7 roll frames with smear/dust
     pub body_lmb: [[Sprite; 4]; 4],   // 4 directions x 4 attack frames
     pub body_rmb: [[Sprite; 4]; 4],   // 4 directions x 4 secondary attack frames
+    pub body_block: [Sprite; 4],      // 4 directions defensive block stance
     pub body_hit: [Sprite; 4],        // 4 directions hit reaction
     pub body_death: Sprite,           // death collapsed frame
 
@@ -466,6 +468,13 @@ impl SpriteBank {
                     generate_base_body_rmb(Direction4::SouthEast, 2),
                     generate_base_body_rmb(Direction4::SouthEast, 3),
                 ],
+            ],
+
+            body_block: [
+                generate_base_body_block(Direction4::South),
+                generate_base_body_block(Direction4::North),
+                generate_base_body_block(Direction4::East),
+                generate_base_body_block(Direction4::SouthEast),
             ],
 
             body_hit: [
@@ -783,20 +792,23 @@ fn paint_humanoid_base(
         }
     }
 
-    // Legs / Trousers (rows 21..25)
+    // Legs / Trousers (rows 21..l_boot_y)
     let lx = (6 + l_leg_off.0).clamp(3, 12) as usize;
     let ly = (21 + l_leg_off.1).clamp(18, 25) as usize;
     let rx = (10 + r_leg_off.0).clamp(5, 14) as usize;
     let ry = (21 + r_leg_off.1).clamp(18, 25) as usize;
 
-    sp.fill_rect(lx, ly, 2, (25 - ly).max(1), pants_dark);
-    sp.fill_rect(rx, ry, 2, (25 - ry).max(1), pants_mid);
+    let l_boot_y = (24 + l_leg_off.1).clamp(21, 26) as usize;
+    let r_boot_y = (24 + r_leg_off.1).clamp(21, 26) as usize;
 
-    // Sturdy Boots (rows 25..28)
-    sp.fill_rect(lx, 25, 3, 3, boots_dark);
-    sp.fill_rect(rx, 25, 3, 3, boots_mid);
-    sp.set_pixel(lx + 1, 25, leather_mid); // boot cuff
-    sp.set_pixel(rx + 1, 25, leather_mid);
+    sp.fill_rect(lx, ly, 2, l_boot_y.saturating_sub(ly).max(1), pants_dark);
+    sp.fill_rect(rx, ry, 2, r_boot_y.saturating_sub(ry).max(1), pants_mid);
+
+    // Sturdy Boots (rows l_boot_y..l_boot_y+3)
+    sp.fill_rect(lx, l_boot_y, 3, 3, boots_dark);
+    sp.fill_rect(rx, r_boot_y, 3, 3, boots_mid);
+    sp.set_pixel(lx + 1, l_boot_y, leather_mid); // boot cuff
+    sp.set_pixel(rx + 1, r_boot_y, leather_mid);
 
     // Contact shadow at feet
     for x in 4..14 {
@@ -817,15 +829,21 @@ fn generate_base_body_idle(dir: Direction4, frame: usize) -> Sprite {
 
 fn generate_base_body_walk(dir: Direction4, frame: usize) -> Sprite {
     let mut sp = Sprite::new(18, 30);
-    let (head_off, l_arm, r_arm, l_leg, r_leg) = match frame % 6 {
-        0 => (0, -1, 1, (1, 0), (-1, -1)),
-        1 => (-1, 0, 0, (1, 0), (0, 0)),
-        2 => (0, 1, -1, (0, 0), (1, 0)),
-        3 => (0, 1, -1, (-1, -1), (1, 0)),
-        4 => (-1, 0, 0, (0, 0), (1, 0)),
-        _ => (0, -1, 1, (1, 0), (0, 0)),
+    let (head_off, l_arm, r_arm, l_leg, r_leg, scarf_lift) = match frame % 6 {
+        // Frame 0: Left heel contact forward (+2, 0), right foot push-off back (-2, 0)
+        0 => (0, -2, 2, (2, 0), (-2, 0), 0),
+        // Frame 1: Left leg weight-bearing plant (+1, 0), right leg passing with knee lift (0, -2)
+        1 => (1, -1, 1, (1, 0), (0, -2), 1),
+        // Frame 2: Left leg under torso (0, 0), right leg swinging forward (+1, -1). Torso rises
+        2 => (0, 0, 0, (0, 0), (1, -1), 0),
+        // Frame 3: Right heel contact forward (+2, 0), left foot push-off back (-2, 0)
+        3 => (0, 2, -2, (-2, 0), (2, 0), 0),
+        // Frame 4: Right leg weight-bearing plant (+1, 0), left leg passing with knee lift (0, -2)
+        4 => (1, 1, -1, (0, -2), (1, 0), 1),
+        // Frame 5: Right leg under torso (0, 0), left leg swinging forward (+1, -1). Torso rises
+        _ => (0, 0, 0, (1, -1), (0, 0), 0),
     };
-    paint_humanoid_base(&mut sp, dir, head_off, l_arm, r_arm, l_leg, r_leg, 0);
+    paint_humanoid_base(&mut sp, dir, head_off, l_arm, r_arm, l_leg, r_leg, scarf_lift);
     sp
 }
 
@@ -884,25 +902,51 @@ fn generate_base_body_roll(dir: Direction4, frame: usize) -> Sprite {
 
 fn generate_base_body_lmb(dir: Direction4, frame: usize) -> Sprite {
     let mut sp = Sprite::new(18, 30);
-    let slash_col = Color::rgb(215, 235, 255);
+    let slash_white = Color::rgb(245, 250, 255);
+    let slash_core = Color::rgb(215, 235, 255);
+    let slash_glow = Palette::MAGE_CYAN;
+
     match frame % 4 {
+        // Frame 0: Anticipation / Windup - pull back weapon, crouch ready
         0 => {
-            paint_humanoid_base(&mut sp, dir, 0, -2, 2, (0, 0), (0, 0), 0);
+            paint_humanoid_base(&mut sp, dir, 0, -3, 3, (-1, 0), (1, 0), 0);
+            match dir {
+                Direction4::East | Direction4::SouthEast => {
+                    sp.set_pixel(3, 11, slash_white);
+                    sp.set_pixel(2, 12, slash_core);
+                }
+                Direction4::North => {
+                    sp.set_pixel(4, 9, slash_white);
+                    sp.set_pixel(5, 10, slash_core);
+                }
+                _ => {
+                    sp.set_pixel(2, 12, slash_white);
+                    sp.set_pixel(3, 13, slash_core);
+                }
+            }
         }
+        // Frame 1: Dynamic forward lunge & sweeping primary slash arc
         1 => {
-            paint_humanoid_base(&mut sp, dir, 0, 1, -2, (1, 0), (-1, 0), 1);
-            sp.fill_rect(11, 10, 4, 2, slash_col);
-            sp.set_pixel(15, 12, slash_col);
-            sp.set_pixel(16, 13, slash_col);
-            sp.set_pixel(15, 14, Palette::MAGE_CYAN);
+            paint_humanoid_base(&mut sp, dir, 1, 3, -3, (2, 0), (-1, 0), 1);
+            sp.fill_rect(10, 8, 4, 2, slash_core);
+            sp.fill_rect(13, 9, 3, 4, slash_white);
+            sp.fill_rect(12, 13, 4, 3, slash_core);
+            sp.set_pixel(16, 11, slash_glow);
+            sp.set_pixel(16, 12, slash_glow);
+            sp.set_pixel(15, 16, slash_glow);
         }
+        // Frame 2: Follow-through cleave & lingering energy wake
         2 => {
-            paint_humanoid_base(&mut sp, dir, 0, 2, -1, (1, 0), (-1, 0), 0);
-            sp.set_pixel(16, 14, slash_col);
-            sp.set_pixel(15, 15, Palette::MAGE_CYAN);
+            paint_humanoid_base(&mut sp, dir, 0, 3, -1, (1, 0), (-1, 0), 0);
+            sp.fill_rect(14, 13, 3, 2, slash_core);
+            sp.set_pixel(16, 14, slash_white);
+            sp.set_pixel(15, 15, slash_glow);
+            sp.set_pixel(13, 16, slash_glow);
         }
+        // Frame 3: Recovery into balanced guard
         _ => {
-            paint_humanoid_base(&mut sp, dir, 0, 0, 0, (0, 0), (0, 0), 0);
+            paint_humanoid_base(&mut sp, dir, 0, 1, 0, (0, 0), (0, 0), 0);
+            sp.set_pixel(13, 13, slash_core);
         }
     }
     sp
@@ -929,6 +973,34 @@ fn generate_base_body_rmb(dir: Direction4, frame: usize) -> Sprite {
             paint_humanoid_base(&mut sp, dir, 0, 0, 0, (0, 0), (0, 0), 0);
         }
     }
+    sp
+}
+
+fn generate_base_body_block(dir: Direction4) -> Sprite {
+    let mut sp = Sprite::new(18, 30);
+    paint_humanoid_base(&mut sp, dir, 1, -1, -1, (-1, 0), (1, 0), 0);
+    let steel = Palette::STEEL_GLINT;
+    let iron = Palette::IRON_MID;
+    match dir {
+        Direction4::East => {
+            sp.fill_rect(11, 12, 4, 7, iron);
+            sp.fill_rect(12, 13, 2, 5, steel);
+        }
+        Direction4::North => {
+            sp.fill_rect(4, 11, 4, 6, iron);
+            sp.fill_rect(10, 11, 4, 6, iron);
+        }
+        Direction4::South => {
+            sp.fill_rect(6, 12, 6, 8, iron);
+            sp.fill_rect(7, 13, 4, 6, steel);
+        }
+        Direction4::SouthEast => {
+            sp.fill_rect(9, 12, 5, 8, iron);
+            sp.fill_rect(10, 13, 3, 6, steel);
+        }
+    }
+    sp.add_outline(Palette::OUTLINE_DARK);
+    sp.add_cool_rim(Palette::RIM_LIGHT_COOL);
     sp
 }
 
@@ -1017,6 +1089,7 @@ fn generate_mage_gear_set() -> ClassGearSet {
 
     let mut lmb_frames: [[Sprite; 4]; 4] = core::array::from_fn(|_| core::array::from_fn(|_| Sprite::new(18, 30)));
     let mut rmb_frames: [[Sprite; 4]; 4] = core::array::from_fn(|_| core::array::from_fn(|_| Sprite::new(18, 30)));
+    let mut block_frame: [Sprite; 4] = core::array::from_fn(|_| Sprite::new(18, 30));
     let mut hit_frame: [Sprite; 4] = core::array::from_fn(|_| Sprite::new(18, 30));
     let death_frame = generate_base_body_death();
 
@@ -1046,6 +1119,17 @@ fn generate_mage_gear_set() -> ClassGearSet {
             }
             rmb_frames[d][f] = sp_r;
         }
+
+        let mut sp_b = generate_base_body_block(dir);
+        head[d].blit(&mut sp_b, 0, 0, false);
+        torso[d].blit(&mut sp_b, 0, 0, false);
+        // Stave raised horizontally with glowing arcane ward
+        sp_b.fill_rect(6, 12, 8, 2, Color::rgb(138, 92, 52));
+        sp_b.fill_rect(12, 11, 3, 3, orb_core);
+        sp_b.set_pixel(13, 12, orb_cyan);
+        sp_b.add_outline(Palette::OUTLINE_DARK);
+        block_frame[d] = sp_b;
+
         let mut sp_h = generate_base_body_hit(dir);
         head[d].blit(&mut sp_h, 0, 0, false);
         torso[d].blit(&mut sp_h, 0, 0, false);
@@ -1061,6 +1145,7 @@ fn generate_mage_gear_set() -> ClassGearSet {
         accessory: [None, None, None, None],
         lmb_frames,
         rmb_frames,
+        block_frame,
         hit_frame,
         death_frame,
     }
@@ -1133,6 +1218,7 @@ fn generate_knight_gear_set() -> ClassGearSet {
 
     let mut lmb_frames: [[Sprite; 4]; 4] = core::array::from_fn(|_| core::array::from_fn(|_| Sprite::new(18, 30)));
     let mut rmb_frames: [[Sprite; 4]; 4] = core::array::from_fn(|_| core::array::from_fn(|_| Sprite::new(18, 30)));
+    let mut block_frame: [Sprite; 4] = core::array::from_fn(|_| Sprite::new(18, 30));
     let mut hit_frame: [Sprite; 4] = core::array::from_fn(|_| Sprite::new(18, 30));
     let death_frame = generate_base_body_death();
 
@@ -1147,9 +1233,20 @@ fn generate_knight_gear_set() -> ClassGearSet {
             let mut sp_l = generate_base_body_lmb(dir, f);
             head[d].blit(&mut sp_l, 0, 0, false);
             torso[d].blit(&mut sp_l, 0, 0, false);
-            if f == 1 {
-                sp_l.fill_rect(12, 6, 5, 3, steel);
-                sp_l.fill_rect(14, 9, 3, 4, steel);
+            if f == 0 {
+                // Raised greatsword high above shoulder with steel sheen
+                sp_l.fill_rect(13, 3, 3, 7, steel);
+                sp_l.set_pixel(12, 6, gold);
+            } else if f == 1 {
+                // Broad sweeping greatsword slash trail
+                sp_l.fill_rect(11, 6, 6, 3, steel);
+                sp_l.fill_rect(13, 8, 4, 6, steel);
+                sp_l.fill_rect(14, 13, 3, 4, Palette::ASH_WHITE);
+                sp_l.set_pixel(17, 10, gold);
+            } else if f == 2 {
+                // Heavy follow through blade rest
+                sp_l.fill_rect(13, 14, 4, 3, steel);
+                sp_l.set_pixel(16, 17, gold);
             }
             lmb_frames[d][f] = sp_l;
 
@@ -1161,6 +1258,39 @@ fn generate_knight_gear_set() -> ClassGearSet {
             }
             rmb_frames[d][f] = sp_r;
         }
+
+        // Dedicated raised shield bastion stance
+        let mut sp_b = generate_base_body_block(dir);
+        head[d].blit(&mut sp_b, 0, 0, false);
+        torso[d].blit(&mut sp_b, 0, 0, false);
+
+        match dir {
+            Direction4::East => {
+                sp_b.fill_rect(10, 10, 6, 12, iron_mid);
+                sp_b.fill_rect(11, 11, 4, 10, crimson);
+                sp_b.fill_rect(12, 13, 2, 4, gold);
+                sp_b.fill_rect(10, 10, 6, 1, steel);
+            }
+            Direction4::South => {
+                sp_b.fill_rect(5, 10, 8, 13, iron_mid);
+                sp_b.fill_rect(6, 11, 6, 11, crimson);
+                sp_b.fill_rect(8, 14, 2, 5, gold);
+                sp_b.fill_rect(5, 10, 8, 1, steel);
+            }
+            Direction4::SouthEast => {
+                sp_b.fill_rect(8, 10, 7, 13, iron_mid);
+                sp_b.fill_rect(9, 11, 5, 11, crimson);
+                sp_b.fill_rect(10, 14, 3, 4, gold);
+                sp_b.fill_rect(8, 10, 7, 1, steel);
+            }
+            Direction4::North => {
+                sp_b.fill_rect(3, 10, 4, 8, iron_dark);
+                sp_b.fill_rect(11, 10, 4, 8, iron_dark);
+            }
+        }
+        sp_b.add_outline(Palette::OUTLINE_DARK);
+        block_frame[d] = sp_b;
+
         let mut sp_h = generate_base_body_hit(dir);
         head[d].blit(&mut sp_h, 0, 0, false);
         torso[d].blit(&mut sp_h, 0, 0, false);
@@ -1176,6 +1306,7 @@ fn generate_knight_gear_set() -> ClassGearSet {
         accessory: [None, None, None, None],
         lmb_frames,
         rmb_frames,
+        block_frame,
         hit_frame,
         death_frame,
     }
@@ -1230,6 +1361,7 @@ fn generate_assassin_gear_set() -> ClassGearSet {
 
     let mut lmb_frames: [[Sprite; 4]; 4] = core::array::from_fn(|_| core::array::from_fn(|_| Sprite::new(18, 30)));
     let mut rmb_frames: [[Sprite; 4]; 4] = core::array::from_fn(|_| core::array::from_fn(|_| Sprite::new(18, 30)));
+    let mut block_frame: [Sprite; 4] = core::array::from_fn(|_| Sprite::new(18, 30));
     let mut hit_frame: [Sprite; 4] = core::array::from_fn(|_| Sprite::new(18, 30));
     let death_frame = generate_base_body_death();
 
@@ -1258,6 +1390,17 @@ fn generate_assassin_gear_set() -> ClassGearSet {
             }
             rmb_frames[d][f] = sp_r;
         }
+
+        let mut sp_b = generate_base_body_block(dir);
+        head[d].blit(&mut sp_b, 0, 0, false);
+        torso[d].blit(&mut sp_b, 0, 0, false);
+        // Crossed twin steel daggers in X-guard
+        sp_b.fill_rect(7, 11, 2, 7, Palette::STEEL_GLINT);
+        sp_b.fill_rect(11, 11, 2, 7, Palette::STEEL_GLINT);
+        sp_b.set_pixel(9, 13, Palette::CAPE_CRIMSON);
+        sp_b.add_outline(Palette::OUTLINE_DARK);
+        block_frame[d] = sp_b;
+
         let mut sp_h = generate_base_body_hit(dir);
         head[d].blit(&mut sp_h, 0, 0, false);
         torso[d].blit(&mut sp_h, 0, 0, false);
@@ -1273,6 +1416,7 @@ fn generate_assassin_gear_set() -> ClassGearSet {
         accessory: [None, None, None, None],
         lmb_frames,
         rmb_frames,
+        block_frame,
         hit_frame,
         death_frame,
     }
@@ -1327,6 +1471,7 @@ fn generate_hunter_gear_set() -> ClassGearSet {
 
     let mut lmb_frames: [[Sprite; 4]; 4] = core::array::from_fn(|_| core::array::from_fn(|_| Sprite::new(18, 30)));
     let mut rmb_frames: [[Sprite; 4]; 4] = core::array::from_fn(|_| core::array::from_fn(|_| Sprite::new(18, 30)));
+    let mut block_frame: [Sprite; 4] = core::array::from_fn(|_| Sprite::new(18, 30));
     let mut hit_frame: [Sprite; 4] = core::array::from_fn(|_| Sprite::new(18, 30));
     let death_frame = generate_base_body_death();
 
@@ -1353,6 +1498,16 @@ fn generate_hunter_gear_set() -> ClassGearSet {
             }
             rmb_frames[d][f] = sp_r;
         }
+
+        let mut sp_b = generate_base_body_block(dir);
+        head[d].blit(&mut sp_b, 0, 0, false);
+        torso[d].blit(&mut sp_b, 0, 0, false);
+        // Pistol sword crossed parry
+        sp_b.fill_rect(6, 12, 7, 2, Color::rgb(138, 92, 52));
+        sp_b.fill_rect(11, 10, 2, 6, Palette::STEEL_GLINT);
+        sp_b.add_outline(Palette::OUTLINE_DARK);
+        block_frame[d] = sp_b;
+
         let mut sp_h = generate_base_body_hit(dir);
         head[d].blit(&mut sp_h, 0, 0, false);
         torso[d].blit(&mut sp_h, 0, 0, false);
@@ -1368,6 +1523,7 @@ fn generate_hunter_gear_set() -> ClassGearSet {
         accessory: [None, None, None, None],
         lmb_frames,
         rmb_frames,
+        block_frame,
         hit_frame,
         death_frame,
     }
@@ -1430,6 +1586,7 @@ fn generate_alchemist_gear_set() -> ClassGearSet {
 
     let mut lmb_frames: [[Sprite; 4]; 4] = core::array::from_fn(|_| core::array::from_fn(|_| Sprite::new(18, 30)));
     let mut rmb_frames: [[Sprite; 4]; 4] = core::array::from_fn(|_| core::array::from_fn(|_| Sprite::new(18, 30)));
+    let mut block_frame: [Sprite; 4] = core::array::from_fn(|_| Sprite::new(18, 30));
     let mut hit_frame: [Sprite; 4] = core::array::from_fn(|_| Sprite::new(18, 30));
     let death_frame = generate_base_body_death();
 
@@ -1458,6 +1615,17 @@ fn generate_alchemist_gear_set() -> ClassGearSet {
             }
             rmb_frames[d][f] = sp_r;
         }
+
+        let mut sp_b = generate_base_body_block(dir);
+        head[d].blit(&mut sp_b, 0, 0, false);
+        torso[d].blit(&mut sp_b, 0, 0, false);
+        // Reinforced alchemical shield & vial
+        sp_b.fill_rect(9, 11, 5, 8, Palette::LEATHER_DARK);
+        sp_b.fill_rect(10, 12, 3, 6, Palette::GOLD_TRIM);
+        sp_b.set_pixel(11, 14, Color::rgb(46, 204, 113));
+        sp_b.add_outline(Palette::OUTLINE_DARK);
+        block_frame[d] = sp_b;
+
         let mut sp_h = generate_base_body_hit(dir);
         head[d].blit(&mut sp_h, 0, 0, false);
         torso[d].blit(&mut sp_h, 0, 0, false);
@@ -1473,6 +1641,7 @@ fn generate_alchemist_gear_set() -> ClassGearSet {
         accessory: [Some(accessory[0].clone()), Some(accessory[1].clone()), Some(accessory[2].clone()), Some(accessory[3].clone())],
         lmb_frames,
         rmb_frames,
+        block_frame,
         hit_frame,
         death_frame,
     }
